@@ -1,6 +1,7 @@
 use serde_wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
+mod commands;
 mod parser;
 mod validate;
 
