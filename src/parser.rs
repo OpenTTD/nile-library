@@ -53,6 +53,19 @@ impl StringCommand {
         }
         None
     }
+
+    fn compile(&self) -> String {
+        let mut result = String::from("{");
+        if let Some(i) = self.index {
+            result.push_str(&format!("{}:", i));
+        }
+        result.push_str(&self.name);
+        if let Some(case) = &self.case {
+            result.push_str(&format!(".{}", case));
+        }
+        result.push_str("}");
+        result
+    }
 }
 
 impl GenderDefinition {
@@ -65,6 +78,10 @@ impl GenderDefinition {
             return Some(result);
         }
         None
+    }
+
+    fn compile(&self) -> String {
+        format!("{{G={}}}", self.gender)
     }
 }
 
@@ -95,6 +112,25 @@ impl ChoiceList {
         }
         None
     }
+
+    fn compile(&self) -> String {
+        let mut result = format!("{{{}", self.name);
+        if let Some(i) = self.indexref {
+            result.push_str(&format!(" {}", i));
+            if let Some(s) = self.indexsubref {
+                result.push_str(&format!(":{}", s))
+            }
+        }
+        for c in &self.choices {
+            if c.is_empty() || c.contains(|v| char::is_ascii_whitespace(&v)) {
+                result.push_str(&format!(r##" "{}""##, c));
+            } else {
+                result.push_str(&format!(" {}", c));
+            }
+        }
+        result.push_str("}");
+        result
+    }
 }
 
 impl FragmentContent {
@@ -107,6 +143,15 @@ impl FragmentContent {
             Ok(FragmentContent::Choice(choice))
         } else {
             Err(format!("Invalid string command: '{}'", string))
+        }
+    }
+
+    fn compile(&self) -> String {
+        match self {
+            Self::Text(s) => s.clone(),
+            Self::Command(command) => command.compile(),
+            Self::Gender(gender) => gender.compile(),
+            Self::Choice(choice) => choice.compile(),
         }
     }
 }
@@ -153,10 +198,15 @@ impl ParsedString {
         }
         Ok(result)
     }
-}
 
-//fn compile_string(parsed: &ParsedString) -> String {
-//}
+    fn compile(&self) -> String {
+        let mut result = String::new();
+        for f in &self.fragments {
+            result.push_str(&f.fragment.compile());
+        }
+        result
+    }
+}
 
 //fn check_string(parsed: &mut ParsedString) {
 // project-type, language-info, base-language
@@ -418,6 +468,84 @@ mod tests {
         assert!(FragmentContent::parse(r##"{P " a}"##).is_err());
         assert!(FragmentContent::parse(r##"{P 1.a a b}"##).is_err());
         assert!(FragmentContent::parse(r##"{P 1:a a b}"##).is_err());
+    }
+
+    #[test]
+    fn test_compile_cmd() {
+        assert_eq!(
+            StringCommand {
+                index: None,
+                name: String::from(""),
+                case: None
+            }
+            .compile(),
+            "{}"
+        );
+        assert_eq!(
+            StringCommand {
+                index: None,
+                name: String::from("{"),
+                case: None
+            }
+            .compile(),
+            "{{}"
+        );
+        assert_eq!(
+            StringCommand {
+                index: Some(1),
+                name: String::from("STRING"),
+                case: Some(String::from("gen"))
+            }
+            .compile(),
+            "{1:STRING.gen}"
+        );
+        assert_eq!(
+            GenderDefinition {
+                gender: String::from("n")
+            }
+            .compile(),
+            "{G=n}"
+        );
+        assert_eq!(
+            ChoiceList {
+                name: String::from("P"),
+                indexref: None,
+                indexsubref: None,
+                choices: vec![String::from("a"), String::from("b")]
+            }
+            .compile(),
+            "{P a b}"
+        );
+        assert_eq!(
+            ChoiceList {
+                name: String::from("P"),
+                indexref: None,
+                indexsubref: None,
+                choices: vec![String::from(""), String::from(" b")]
+            }
+            .compile(),
+            r##"{P "" " b"}"##
+        );
+        assert_eq!(
+            ChoiceList {
+                name: String::from("P"),
+                indexref: Some(1),
+                indexsubref: None,
+                choices: vec![String::from("a"), String::from("b")]
+            }
+            .compile(),
+            "{P 1 a b}"
+        );
+        assert_eq!(
+            ChoiceList {
+                name: String::from("P"),
+                indexref: Some(1),
+                indexsubref: Some(2),
+                choices: vec![String::from("a"), String::from("b")]
+            }
+            .compile(),
+            "{P 1:2 a b}"
+        );
     }
 
     #[test]
