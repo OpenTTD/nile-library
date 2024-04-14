@@ -161,7 +161,7 @@ impl ParsedString {
         let mut result = ParsedString {
             fragments: Vec::new(),
         };
-        let mut rest: &str = string.trim_end(); // TODO what to do with \t, \r, \n, ... inside the string?
+        let mut rest: &str = string;
         let mut position: usize = 0;
         while !rest.is_empty() {
             if let Some(start) = rest.find('{') {
@@ -207,26 +207,6 @@ impl ParsedString {
         result
     }
 }
-
-//fn check_string(parsed: &mut ParsedString) {
-// project-type, language-info, base-language
-// gender-assignment in front
-// all commands known and allowed in project
-// plural/gender references valid
-// font-size at front
-//}
-
-//fn normalize_string(parsed: &mut ParsedString) {
-// project-type
-// add indexes to all parameters, including plurals/genders
-//}
-
-//fn validate_string(base: &ParsedString, trans: &ParsedString) {
-// compare normalised parameters
-// important parameters
-// unimportant amount, but > 0
-// mode-params for important parameters
-//}
 
 #[cfg(test)]
 mod tests {
