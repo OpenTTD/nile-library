@@ -31,7 +31,7 @@ enum FragmentContent {
 #[derive(Debug, PartialEq)]
 struct StringFragment {
     position: usize,
-    fragment: FragmentContent,
+    content: FragmentContent,
 }
 
 #[derive(Debug, PartialEq)]
@@ -170,7 +170,7 @@ impl ParsedString {
                     (text, rest) = rest.split_at(start);
                     result.fragments.push(StringFragment {
                         position: position,
-                        fragment: FragmentContent::Text(String::from(text)),
+                        content: FragmentContent::Text(String::from(text)),
                     });
                 }
                 position += start;
@@ -178,9 +178,9 @@ impl ParsedString {
                     let text: &str;
                     (text, rest) = rest.split_at(end + 1);
                     match FragmentContent::parse(text) {
-                        Ok(fragment) => result.fragments.push(StringFragment {
+                        Ok(content) => result.fragments.push(StringFragment {
                             position: position,
-                            fragment: fragment,
+                            content: content,
                         }),
                         Err(message) => return Err(message),
                     };
@@ -191,7 +191,7 @@ impl ParsedString {
             } else {
                 result.fragments.push(StringFragment {
                     position: position,
-                    fragment: FragmentContent::Text(String::from(rest)),
+                    content: FragmentContent::Text(String::from(rest)),
                 });
                 break;
             }
@@ -202,7 +202,7 @@ impl ParsedString {
     fn compile(&self) -> String {
         let mut result = String::new();
         for f in &self.fragments {
-            result.push_str(&f.fragment.compile());
+            result.push_str(&f.content.compile());
         }
         result
     }
@@ -564,13 +564,13 @@ mod tests {
             vec![
                 StringFragment {
                     position: 0,
-                    fragment: FragmentContent::Gender(GenderDefinition {
+                    content: FragmentContent::Gender(GenderDefinition {
                         gender: String::from("n")
                     })
                 },
                 StringFragment {
                     position: 5,
-                    fragment: FragmentContent::Command(StringCommand {
+                    content: FragmentContent::Command(StringCommand {
                         index: None,
                         name: String::from("ORANGE"),
                         case: None
@@ -578,11 +578,11 @@ mod tests {
                 },
                 StringFragment {
                     position: 13,
-                    fragment: FragmentContent::Text(String::from("OpenTTD "))
+                    content: FragmentContent::Text(String::from("OpenTTD "))
                 },
                 StringFragment {
                     position: 21,
-                    fragment: FragmentContent::Command(StringCommand {
+                    content: FragmentContent::Command(StringCommand {
                         index: None,
                         name: String::from("STRING"),
                         case: None
