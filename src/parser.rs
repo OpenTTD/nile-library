@@ -70,7 +70,7 @@ impl StringCommand {
 
 impl GenderDefinition {
     fn parse(string: &str) -> Option<GenderDefinition> {
-        let pat_gender = Regex::new(r"^\{G *= *(\w+) *\}$").unwrap();
+        let pat_gender = Regex::new(r"^\{G\s*=\s*(\w+)\}$").unwrap();
         if let Some(caps) = pat_gender.captures(string) {
             let result = GenderDefinition {
                 gender: String::from(&caps[1]),
@@ -88,8 +88,8 @@ impl GenderDefinition {
 impl ChoiceList {
     fn parse(string: &str) -> Option<ChoiceList> {
         let pat_choice =
-            Regex::new(r"^\{([PG])(?: +(\d+)(?::(\d+))?)?( +[^ 0-9].*?) *\}$").unwrap();
-        let pat_item = Regex::new(r##"^ +(?:([^ "]+)|"([^"]*)")"##).unwrap();
+            Regex::new(r"^\{([PG])(?:\s+(\d+)(?::(\d+))?)?(\s+[^\s0-9].*?)\s*\}$").unwrap();
+        let pat_item = Regex::new(r##"^\s+(?:([^\s"]+)|"([^"]*)")"##).unwrap();
         if let Some(caps) = pat_choice.captures(string) {
             let mut result = ChoiceList {
                 name: String::from(&caps[1]),
@@ -284,6 +284,15 @@ mod tests {
             }))
         );
         assert_eq!(
+            FragmentContent::parse("{P\na\tb}"),
+            Ok(FragmentContent::Choice(ChoiceList {
+                name: String::from("P"),
+                indexref: None,
+                indexsubref: None,
+                choices: vec![String::from("a"), String::from("b")]
+            }))
+        );
+        assert_eq!(
             FragmentContent::parse(r##"{P "" b}"##),
             Ok(FragmentContent::Choice(ChoiceList {
                 name: String::from("P"),
@@ -303,6 +312,15 @@ mod tests {
         );
         assert_eq!(
             FragmentContent::parse("{P 1 a b}"),
+            Ok(FragmentContent::Choice(ChoiceList {
+                name: String::from("P"),
+                indexref: Some(1),
+                indexsubref: None,
+                choices: vec![String::from("a"), String::from("b")]
+            }))
+        );
+        assert_eq!(
+            FragmentContent::parse("{P\t1\na\rb\n}"),
             Ok(FragmentContent::Choice(ChoiceList {
                 name: String::from("P"),
                 indexref: Some(1),
