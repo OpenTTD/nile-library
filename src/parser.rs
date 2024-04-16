@@ -1,27 +1,27 @@
 use regex::Regex;
 
 #[derive(Debug, PartialEq)]
-struct StringCommand {
-    index: Option<usize>,
-    name: String,
-    case: Option<String>,
+pub struct StringCommand {
+    pub index: Option<usize>,
+    pub name: String,
+    pub case: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
-struct GenderDefinition {
-    gender: String,
+pub struct GenderDefinition {
+    pub gender: String,
 }
 
 #[derive(Debug, PartialEq)]
-struct ChoiceList {
-    name: String,
-    indexref: Option<usize>,
-    indexsubref: Option<usize>,
-    choices: Vec<String>,
+pub struct ChoiceList {
+    pub name: String,
+    pub indexref: Option<usize>,
+    pub indexsubref: Option<usize>,
+    pub choices: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
-enum FragmentContent {
+pub enum FragmentContent {
     Text(String),
     Command(StringCommand),
     Gender(GenderDefinition),
@@ -29,14 +29,14 @@ enum FragmentContent {
 }
 
 #[derive(Debug, PartialEq)]
-struct StringFragment {
-    position: usize,
-    content: FragmentContent,
+pub struct StringFragment {
+    pub position: usize,
+    pub content: FragmentContent,
 }
 
 #[derive(Debug, PartialEq)]
-struct ParsedString {
-    fragments: Vec<StringFragment>,
+pub struct ParsedString {
+    pub fragments: Vec<StringFragment>,
 }
 
 impl StringCommand {

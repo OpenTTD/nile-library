@@ -1,5 +1,7 @@
 use clap::Parser;
 
+mod commands;
+mod parser;
 mod validate;
 
 #[derive(Parser, Debug)]
