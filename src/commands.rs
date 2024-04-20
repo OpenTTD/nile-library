@@ -1,29 +1,37 @@
-struct ParameterInfo {
-    allow_plural: bool,
-    allow_gender: bool,
+pub struct ParameterInfo {
+    pub allow_plural: bool,
+    pub allow_gender: bool,
 }
 
-enum Occurence {
+#[derive(PartialEq, Copy, Clone)]
+pub enum Occurence {
     ANY,     //< Command can be added or removed in translation without restriction.
     NONZERO, //< Command must appear in translation if and only if it is present in the base, but the amount may differ.
     EXACT,   //< Command must match exactly with base.
 }
 
-enum Dialect {
+#[derive(PartialEq, Copy, Clone)]
+pub enum Dialect {
     NEWGRF,
     GAMESCRIPT,
     OPENTTD,
 }
 
-struct CommandInfo<'a> {
-    name: &'a str,
-    norm_name: Option<&'a str>,
-    dialects: &'a [Dialect],
-    occurence: Occurence,
-    front_only: bool,
-    allow_case: bool,
-    def_plural_subindex: Option<usize>,
-    parameters: &'a [ParameterInfo],
+pub struct CommandInfo<'a> {
+    pub name: &'a str,
+    pub norm_name: Option<&'a str>,
+    pub dialects: &'a [Dialect],
+    pub occurence: Occurence,
+    pub front_only: bool,
+    pub allow_case: bool,
+    pub def_plural_subindex: Option<usize>,
+    pub parameters: &'a [ParameterInfo],
+}
+
+impl<'a> CommandInfo<'a> {
+    pub fn get_norm_name(&self) -> &'a str {
+        self.norm_name.unwrap_or(self.name)
+    }
 }
 
 const P__: ParameterInfo = ParameterInfo {
@@ -48,7 +56,7 @@ const DNGO: &'static [Dialect] = &[Dialect::NEWGRF, Dialect::GAMESCRIPT, Dialect
 const D_GO: &'static [Dialect] = &[Dialect::GAMESCRIPT, Dialect::OPENTTD];
 const D__O: &'static [Dialect] = &[Dialect::OPENTTD];
 
-const COMMANDS: &'static [CommandInfo] = &[
+pub const COMMANDS: &'static [CommandInfo] = &[
     // names for unicode characters, freely usable by translators
     CommandInfo {
         name: "NBSP",
