@@ -5,9 +5,10 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Deserialize, Debug)]
 pub struct LanguageConfig {
+    pub dialect: String, //< "newgrf", "game-script", "openttd"
     pub cases: Vec<String>,
     pub genders: Vec<String>,
-    pub plural_count: u32,
+    pub plural_count: usize,
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -16,6 +17,17 @@ pub struct ValidationError {
     pub position: Option<usize>, //< byte offset in input string
     pub message: String,
     pub suggestion: Option<String>,
+}
+
+impl LanguageConfig {
+    fn get_dialect(&self) -> Dialect {
+        match self.dialect.as_str() {
+            "newgrf" => Dialect::NEWGRF,
+            "game-script" => Dialect::GAMESCRIPT,
+            "openttd" => Dialect::OPENTTD,
+            _ => panic!(),
+        }
+    }
 }
 
 /**
