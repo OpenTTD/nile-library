@@ -1,5 +1,7 @@
+use crate::commands::{CommandInfo, Dialect, Occurence, COMMANDS};
 use crate::parser::{FragmentContent, ParsedString, StringCommand};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Deserialize, Debug)]
 pub struct LanguageConfig {
@@ -8,8 +10,10 @@ pub struct LanguageConfig {
     pub plural_count: u32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub struct ValidationError {
+    pub critical: bool, //< true: translation is broken, do not commit. false: translation has minor issues, but is probably better than no translation
+    pub position: Option<usize>, //< byte offset in input string
     pub message: String,
     pub suggestion: Option<String>,
 }
@@ -70,26 +74,87 @@ fn sanitize_whitespace(parsed: &mut ParsedString) {
     }
 }
 
-//fn check_string(parsed: &mut ParsedString) {
-// project-type, language-info, base-language
-// gender-assignment in front
-// all commands known and allowed in project
-// plural/gender references valid
-// no subindex for gender references
-// no genders/cases for GS
-// font-size at front
-//}
+struct StringSignature {
+    parameters: HashMap<usize, &'static CommandInfo<'static>>,
+    nonpositional_count: HashMap<String, (Occurence, usize)>,
+    // TODO track color/lineno/colorstack for positional parameters
+}
+
+fn get_signature(
+    dialect: &Dialect,
+    base: &ParsedString,
+) -> Result<StringSignature, Vec<ValidationError>> {
+    let mut errors = Vec::new();
+    let mut signature = StringSignature {
+        parameters: HashMap::new(),
+        nonpositional_count: HashMap::new(),
+    };
+
+    let mut pos = 0;
+    for fragment in &base.fragments {
+        if let FragmentContent::Command(cmd) = &fragment.content {
+            if let Some(info) = COMMANDS
+                .into_iter()
+                .find(|ci| ci.name == cmd.name && ci.dialects.contains(&dialect))
+            {
+                if info.parameters.is_empty() {
+                    if let Some(index) = cmd.index {
+                        errors.push(ValidationError {
+                            critical: true,
+                            position: Some(fragment.position),
+                            message: format!(
+                                "Command '{{{}}}' cannot have a position reference.",
+                                cmd.name
+                            ),
+                            suggestion: Some(format!("Remove '{}:'", index)),
+                        });
+                    }
+                    let norm_name = String::from(info.get_norm_name());
+                    if let Some(existing) = signature.nonpositional_count.get_mut(&norm_name) {
+                        existing.1 += 1;
+                    } else {
+                        signature
+                            .nonpositional_count
+                            .insert(norm_name, (info.occurence.clone(), 1));
+                    }
+                } else {
+                    if let Some(index) = cmd.index {
+                        pos = index;
+                    }
+                    if let Some(existing) = signature.parameters.insert(pos, info) {
+                        errors.push(ValidationError {
+                            critical: true,
+                            position: Some(fragment.position),
+                            message: format!(
+                                "Command '{{{}:{}}}' references the same position as '{{{}:{}}}' before.",
+                                pos, cmd.name, pos, existing.name
+                            ),
+                            suggestion: Some(String::from("Assign unique position references.")),
+                        });
+                    }
+                    pos += 1;
+                }
+            } else {
+                errors.push(ValidationError {
+                    critical: true,
+                    position: Some(fragment.position),
+                    message: format!("Unknown string command '{{{}}}'", cmd.name),
+                    suggestion: None,
+                });
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(signature)
+    } else {
+        Err(errors)
+    }
+}
 
 //fn normalize_string(parsed: &mut ParsedString) {
 // project-type
 // add indexes to all parameters, including plurals/genders
-//}
-
-//fn validate_string(base: &ParsedString, trans: &ParsedString) {
-// compare normalised parameters
-// important parameters
-// unimportant amount, but > 0
-// mode-params for important parameters
 //}
 
 #[cfg(test)]
@@ -113,5 +178,109 @@ mod tests {
         assert_eq!(s1, String::from(""));
         assert_eq!(s2, String::from(" a b c"));
         assert_eq!(s3, String::from(" a b c"));
+    }
+
+    #[test]
+    fn test_signature_empty() {
+        let parsed = ParsedString::parse("").unwrap();
+        let sig = get_signature(&Dialect::OPENTTD, &parsed).unwrap();
+        assert!(sig.parameters.is_empty());
+        assert!(sig.nonpositional_count.is_empty());
+    }
+
+    #[test]
+    fn test_signature_pos() {
+        let parsed = ParsedString::parse("{P a b}{RED}{NUM}{NBSP}{MONO_FONT}{5:STRING.foo}{RED}{2:STRING3.bar}{RAW_STRING}{G c d}").unwrap();
+        let sig = get_signature(&Dialect::OPENTTD, &parsed).unwrap();
+        assert_eq!(sig.parameters.len(), 4);
+        assert_eq!(sig.parameters.get(&0).unwrap().name, "NUM");
+        assert_eq!(sig.parameters.get(&5).unwrap().name, "STRING");
+        assert_eq!(sig.parameters.get(&2).unwrap().name, "STRING3");
+        assert_eq!(sig.parameters.get(&3).unwrap().name, "RAW_STRING");
+        assert_eq!(sig.nonpositional_count.len(), 3);
+        assert_eq!(
+            sig.nonpositional_count.get("RED"),
+            Some(&(Occurence::NONZERO, 2))
+        );
+        assert_eq!(
+            sig.nonpositional_count.get("MONO_FONT"),
+            Some(&(Occurence::EXACT, 1))
+        );
+        assert_eq!(
+            sig.nonpositional_count.get("NBSP"),
+            Some(&(Occurence::ANY, 1))
+        );
+    }
+
+    #[test]
+    fn test_signature_dup() {
+        let parsed = ParsedString::parse("{NUM}{0:COMMA}").unwrap();
+        let err = get_signature(&Dialect::OPENTTD, &parsed).err().unwrap();
+        assert_eq!(err.len(), 1);
+        assert_eq!(
+            err[0],
+            ValidationError {
+                critical: true,
+                position: Some(5),
+                message: String::from(
+                    "Command '{0:COMMA}' references the same position as '{0:NUM}' before."
+                ),
+                suggestion: Some(String::from("Assign unique position references.")),
+            }
+        );
+    }
+
+    #[test]
+    fn test_signature_dialect() {
+        let parsed = ParsedString::parse("{RAW_STRING}").unwrap();
+
+        let sig = get_signature(&Dialect::OPENTTD, &parsed).unwrap();
+        assert_eq!(sig.parameters.len(), 1);
+        assert_eq!(sig.parameters.get(&0).unwrap().name, "RAW_STRING");
+        assert_eq!(sig.nonpositional_count.len(), 0);
+
+        let err = get_signature(&Dialect::NEWGRF, &parsed).err().unwrap();
+        assert_eq!(err.len(), 1);
+        assert_eq!(
+            err[0],
+            ValidationError {
+                critical: true,
+                position: Some(0),
+                message: String::from("Unknown string command '{RAW_STRING}'"),
+                suggestion: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_signature_unknown() {
+        let parsed = ParsedString::parse("{FOOBAR}").unwrap();
+        let err = get_signature(&Dialect::OPENTTD, &parsed).err().unwrap();
+        assert_eq!(err.len(), 1);
+        assert_eq!(
+            err[0],
+            ValidationError {
+                critical: true,
+                position: Some(0),
+                message: String::from("Unknown string command '{FOOBAR}'"),
+                suggestion: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_signature_nonpos() {
+        let parsed = ParsedString::parse("{1:RED}").unwrap();
+        let err = get_signature(&Dialect::OPENTTD, &parsed).err().unwrap();
+        assert_eq!(err.len(), 1);
+        assert_eq!(
+            err[0],
+            ValidationError {
+                critical: true,
+                position: Some(0),
+                message: String::from("Command '{RED}' cannot have a position reference."),
+                suggestion: Some(String::from("Remove '1:'")),
+            }
+        );
     }
 }

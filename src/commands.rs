@@ -3,7 +3,7 @@ pub struct ParameterInfo {
     pub allow_gender: bool,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Occurence {
     ANY,     //< Command can be added or removed in translation without restriction.
     NONZERO, //< Command must appear in translation if and only if it is present in the base, but the amount may differ.

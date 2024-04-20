@@ -146,7 +146,7 @@ impl FragmentContent {
 }
 
 impl ParsedString {
-    fn parse(string: &str) -> Result<ParsedString, String> {
+    pub fn parse(string: &str) -> Result<ParsedString, String> {
         let mut result = ParsedString {
             fragments: Vec::new(),
         };
@@ -188,7 +188,7 @@ impl ParsedString {
         Ok(result)
     }
 
-    fn compile(&self) -> String {
+    pub fn compile(&self) -> String {
         let mut result = String::new();
         for f in &self.fragments {
             result.push_str(&f.content.compile());
