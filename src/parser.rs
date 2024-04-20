@@ -42,7 +42,7 @@ pub struct ParsedString {
 impl StringCommand {
     fn parse(string: &str) -> Option<StringCommand> {
         let pat_command =
-            Regex::new(r"^\{(?:(\d+):)?(|\{|[A-Z]+[A-Z0-9]*)(?:\.(\w+))?\}$").unwrap();
+            Regex::new(r"^\{(?:(\d+):)?(|\{|[A-Z]+[A-Z0-9_]*)(?:\.(\w+))?\}$").unwrap();
         let caps = pat_command.captures(string)?;
         Some(StringCommand {
             index: caps.get(1).and_then(|v| v.as_str().parse().ok()),
@@ -216,6 +216,14 @@ mod tests {
             Ok(FragmentContent::Command(StringCommand {
                 index: None,
                 name: String::from("{"),
+                case: None
+            }))
+        );
+        assert_eq!(
+            FragmentContent::parse("{BIG_FONT}"),
+            Ok(FragmentContent::Command(StringCommand {
+                index: None,
+                name: String::from("BIG_FONT"),
                 case: None
             }))
         );
@@ -476,6 +484,15 @@ mod tests {
             }
             .compile(),
             "{{}"
+        );
+        assert_eq!(
+            StringCommand {
+                index: None,
+                name: String::from("BIG_FONT"),
+                case: None
+            }
+            .compile(),
+            "{BIG_FONT}"
         );
         assert_eq!(
             StringCommand {
