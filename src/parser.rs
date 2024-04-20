@@ -43,15 +43,12 @@ impl StringCommand {
     fn parse(string: &str) -> Option<StringCommand> {
         let pat_command =
             Regex::new(r"^\{(?:(\d+):)?(|\{|[A-Z]+[A-Z0-9]*)(?:\.(\w+))?\}$").unwrap();
-        if let Some(caps) = pat_command.captures(string) {
-            let result = StringCommand {
-                index: caps.get(1).and_then(|v| v.as_str().parse().ok()),
-                name: String::from(&caps[2]),
-                case: caps.get(3).map(|v| String::from(v.as_str())),
-            };
-            return Some(result);
-        }
-        None
+        let caps = pat_command.captures(string)?;
+        Some(StringCommand {
+            index: caps.get(1).and_then(|v| v.as_str().parse().ok()),
+            name: String::from(&caps[2]),
+            case: caps.get(3).map(|v| String::from(v.as_str())),
+        })
     }
 
     fn compile(&self) -> String {
@@ -71,13 +68,10 @@ impl StringCommand {
 impl GenderDefinition {
     fn parse(string: &str) -> Option<GenderDefinition> {
         let pat_gender = Regex::new(r"^\{G\s*=\s*(\w+)\}$").unwrap();
-        if let Some(caps) = pat_gender.captures(string) {
-            let result = GenderDefinition {
-                gender: String::from(&caps[1]),
-            };
-            return Some(result);
-        }
-        None
+        let caps = pat_gender.captures(string)?;
+        Some(GenderDefinition {
+            gender: String::from(&caps[1]),
+        })
     }
 
     fn compile(&self) -> String {
@@ -90,27 +84,22 @@ impl ChoiceList {
         let pat_choice =
             Regex::new(r"^\{([PG])(?:\s+(\d+)(?::(\d+))?)?(\s+[^\s0-9].*?)\s*\}$").unwrap();
         let pat_item = Regex::new(r##"^\s+(?:([^\s"]+)|"([^"]*)")"##).unwrap();
-        if let Some(caps) = pat_choice.captures(string) {
-            let mut result = ChoiceList {
-                name: String::from(&caps[1]),
-                indexref: caps.get(2).and_then(|v| v.as_str().parse().ok()),
-                indexsubref: caps.get(3).and_then(|v| v.as_str().parse().ok()),
-                choices: Vec::new(),
-            };
-            let mut rest = &caps[4];
-            while !rest.is_empty() {
-                if let Some(m) = pat_item.captures(rest) {
-                    result
-                        .choices
-                        .push(String::from(m.get(1).or(m.get(2)).unwrap().as_str()));
-                    rest = &rest[m.get(0).unwrap().end()..];
-                } else {
-                    return None;
-                }
-            }
-            return Some(result);
+        let caps = pat_choice.captures(string)?;
+        let mut result = ChoiceList {
+            name: String::from(&caps[1]),
+            indexref: caps.get(2).and_then(|v| v.as_str().parse().ok()),
+            indexsubref: caps.get(3).and_then(|v| v.as_str().parse().ok()),
+            choices: Vec::new(),
+        };
+        let mut rest = &caps[4];
+        while !rest.is_empty() {
+            let m = pat_item.captures(rest)?;
+            result
+                .choices
+                .push(String::from(m.get(1).or(m.get(2)).unwrap().as_str()));
+            rest = &rest[m.get(0).unwrap().end()..];
         }
-        None
+        return Some(result);
     }
 
     fn compile(&self) -> String {
