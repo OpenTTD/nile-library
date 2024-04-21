@@ -549,10 +549,65 @@ fn validate_string(
     errors
 }
 
-//fn normalize_string(parsed: &mut ParsedString) {
-// project-type
-// add indexes to all parameters, including plurals/genders
-//}
+fn normalize_string(dialect: &Dialect, parsed: &mut ParsedString) {
+    let mut parameters = HashMap::new();
+
+    let mut pos = 0;
+    for fragment in &mut parsed.fragments {
+        match &mut fragment.content {
+            FragmentContent::Command(cmd) => {
+                if let Some(info) = COMMANDS
+                    .into_iter()
+                    .find(|ci| ci.name == cmd.name && ci.dialects.contains(&dialect))
+                {
+                    if let Some(norm_name) = info.norm_name {
+                        // normalize name
+                        cmd.name = String::from(norm_name);
+                    }
+                    if !info.parameters.is_empty() {
+                        if let Some(index) = cmd.index {
+                            pos = index;
+                        } else {
+                            // add missing indices
+                            cmd.index = Some(pos);
+                        }
+                        parameters.insert(pos, info);
+                        pos += 1;
+                    }
+                }
+            }
+            FragmentContent::Choice(cmd) => {
+                match cmd.name.as_str() {
+                    "P" => {
+                        if cmd.indexref.is_none() && pos > 0 {
+                            // add missing indices
+                            cmd.indexref = Some(pos - 1);
+                        }
+                    }
+                    "G" => {
+                        if cmd.indexref.is_none() {
+                            // add missing indices
+                            cmd.indexref = Some(pos);
+                        }
+                    }
+                    _ => panic!(),
+                };
+            }
+            _ => (),
+        }
+    }
+
+    for fragment in &mut parsed.fragments {
+        if let FragmentContent::Choice(cmd) = &mut fragment.content {
+            if let Some(ref_info) = cmd.indexref.and_then(|pos| parameters.get(&pos)) {
+                if cmd.indexsubref == ref_info.def_plural_subindex.or(Some(0)) {
+                    // remove subindex, if default
+                    cmd.indexsubref = None;
+                }
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1296,5 +1351,36 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn test_normalize_cmd() {
+        let mut parsed =
+            ParsedString::parse("{RED}{NBSP}{2:RAW_STRING}{0:STRING5}{COMMA}").unwrap();
+        normalize_string(&Dialect::OPENTTD, &mut parsed);
+        let result = parsed.compile();
+        assert_eq!(result, "{RED}{NBSP}{2:STRING}{0:STRING}{1:COMMA}");
+    }
+
+    #[test]
+    fn test_normalize_ref() {
+        let mut parsed = ParsedString::parse("{RED}{NBSP}{P a b}{2:STRING}{P 1 a b}{G 0:1 a b}{0:STRING}{G 0 a b}{P 0:1 a b}{COMMA}{P a b}{G a b}").unwrap();
+        normalize_string(&Dialect::OPENTTD, &mut parsed);
+        let result = parsed.compile();
+        assert_eq!(result, "{RED}{NBSP}{P a b}{2:STRING}{P 1 a b}{G 0:1 a b}{0:STRING}{G 0 a b}{P 0:1 a b}{1:COMMA}{P 1 a b}{G 2 a b}");
+    }
+
+    #[test]
+    fn test_normalize_subref() {
+        let mut parsed = ParsedString::parse(
+            "{NUM}{P 0:0 a b}{G 1:0 a b}{G 1:1 a b}{STRING}{P 1:2 a b}{CARGO_LONG}{P 2:1 a b}",
+        )
+        .unwrap();
+        normalize_string(&Dialect::OPENTTD, &mut parsed);
+        let result = parsed.compile();
+        assert_eq!(
+            result,
+            "{0:NUM}{P 0 a b}{G 1 a b}{G 1:1 a b}{1:STRING}{P 1:2 a b}{2:CARGO_LONG}{P 2 a b}"
+        );
     }
 }
