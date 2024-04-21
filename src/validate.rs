@@ -118,7 +118,7 @@ fn get_signature(
                                 "Command '{{{}}}' cannot have a position reference.",
                                 cmd.name
                             ),
-                            suggestion: Some(format!("Remove '{}:'", index)),
+                            suggestion: Some(format!("Remove '{}:'.", index)),
                         });
                     }
                     let norm_name = String::from(info.get_norm_name());
@@ -150,7 +150,7 @@ fn get_signature(
                 errors.push(ValidationError {
                     critical: true,
                     position: Some(fragment.position),
-                    message: format!("Unknown string command '{{{}}}'", cmd.name),
+                    message: format!("Unknown string command '{{{}}}'.", cmd.name),
                     suggestion: None,
                 });
             }
@@ -258,7 +258,7 @@ mod tests {
             ValidationError {
                 critical: true,
                 position: Some(0),
-                message: String::from("Unknown string command '{RAW_STRING}'"),
+                message: String::from("Unknown string command '{RAW_STRING}'."),
                 suggestion: None,
             }
         );
@@ -274,7 +274,7 @@ mod tests {
             ValidationError {
                 critical: true,
                 position: Some(0),
-                message: String::from("Unknown string command '{FOOBAR}'"),
+                message: String::from("Unknown string command '{FOOBAR}'."),
                 suggestion: None,
             }
         );
@@ -291,7 +291,7 @@ mod tests {
                 critical: true,
                 position: Some(0),
                 message: String::from("Command '{RED}' cannot have a position reference."),
-                suggestion: Some(String::from("Remove '1:'")),
+                suggestion: Some(String::from("Remove '1:'.")),
             }
         );
     }
