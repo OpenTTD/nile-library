@@ -1,7 +1,7 @@
 use crate::commands::{CommandInfo, Dialect, Occurence, COMMANDS};
 use crate::parser::{FragmentContent, ParsedString, StringCommand};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Deserialize, Debug)]
 pub struct LanguageConfig {
@@ -88,7 +88,7 @@ fn sanitize_whitespace(parsed: &mut ParsedString) {
 
 struct StringSignature {
     parameters: HashMap<usize, &'static CommandInfo<'static>>,
-    nonpositional_count: HashMap<String, (Occurence, usize)>,
+    nonpositional_count: BTreeMap<String, (Occurence, usize)>,
     // TODO track color/lineno/colorstack for positional parameters
 }
 
@@ -99,7 +99,7 @@ fn get_signature(
     let mut errors = Vec::new();
     let mut signature = StringSignature {
         parameters: HashMap::new(),
-        nonpositional_count: HashMap::new(),
+        nonpositional_count: BTreeMap::new(),
     };
 
     let mut pos = 0;
