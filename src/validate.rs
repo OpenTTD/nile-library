@@ -1,5 +1,5 @@
 use crate::commands::{CommandInfo, Dialect, Occurence, COMMANDS};
-use crate::parser::{FragmentContent, ParsedString, StringCommand};
+use crate::parser::{FragmentContent, ParsedString};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -19,6 +19,12 @@ pub struct ValidationError {
     pub suggestion: Option<String>,
 }
 
+#[derive(Serialize, Debug)]
+pub struct ValidationResult {
+    pub errors: Vec<ValidationError>,
+    pub normalized: Option<String>,
+}
+
 impl LanguageConfig {
     fn get_dialect(&self) -> Dialect {
         self.dialect.as_str().into()
@@ -34,22 +40,125 @@ impl LanguageConfig {
 }
 
 /**
+ * Validate whether a base string is valid.
+ *
+ * @param config The language configuration of the base language. (dialect and plural form)
+ * @param base The base string to validate.
+ *
+ * @returns A normalized form of the base string for translators, and a list of error messages, if the base is invalid.
+ */
+pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
+    let mut base = match ParsedString::parse(&base) {
+        Err(err) => {
+            return ValidationResult {
+                errors: vec![ValidationError {
+                    critical: true,
+                    position: None,
+                    message: err,
+                    suggestion: None,
+                }],
+                normalized: None,
+            };
+        }
+        Ok(parsed) => parsed,
+    };
+    let errs = validate_string(&config, &base, None);
+    if errs.iter().any(|e| e.critical) {
+        ValidationResult {
+            errors: errs,
+            normalized: None,
+        }
+    } else {
+        sanitize_whitespace(&mut base);
+        normalize_string(&config.get_dialect(), &mut base);
+        ValidationResult {
+            errors: errs,
+            normalized: Some(base.compile()),
+        }
+    }
+}
+
+/**
  * Validate whether a translation is valid for the given base string.
  *
  * @param config The language configuration to validate against.
  * @param base The base string to validate against.
- * @param case The case of the translation.
+ * @param case The case of the translation. Use "" or "default" for the default case.
  * @param translation The translation to validate.
  *
- * @returns A clear and specific error message if the translation is invalid. None otherwise.
+ * @returns A normalized form of the translation, and a list of error messages, if the translation is invalid.
  */
-pub fn validate(
+pub fn validate_translation(
     config: LanguageConfig,
     base: String,
     case: String,
     translation: String,
-) -> Option<ValidationError> {
-    None
+) -> ValidationResult {
+    let base = match ParsedString::parse(&base) {
+        Err(_) => {
+            return ValidationResult {
+                errors: vec![ValidationError {
+                    critical: true,
+                    position: None,
+                    message: String::from("Base language text is invalid."),
+                    suggestion: Some(String::from("This is a bug; wait until it is fixed.")),
+                }],
+                normalized: None,
+            };
+        }
+        Ok(parsed) => parsed,
+    };
+    if case != "" && case != "default" {
+        if !config.allow_cases() {
+            return ValidationResult {
+                errors: vec![ValidationError {
+                    critical: true,
+                    position: None,
+                    message: String::from("No cases allowed."),
+                    suggestion: None,
+                }],
+                normalized: None,
+            };
+        } else if !config.cases.contains(&case) {
+            return ValidationResult {
+                errors: vec![ValidationError {
+                    critical: true,
+                    position: None,
+                    message: format!("Unknown case '{}'.", case),
+                    suggestion: Some(format!("Known cases are: '{}'", config.cases.join("', '"))),
+                }],
+                normalized: None,
+            };
+        }
+    }
+    let mut translation = match ParsedString::parse(&translation) {
+        Err(err) => {
+            return ValidationResult {
+                errors: vec![ValidationError {
+                    critical: true,
+                    position: None,
+                    message: err,
+                    suggestion: None,
+                }],
+                normalized: None,
+            };
+        }
+        Ok(parsed) => parsed,
+    };
+    let errs = validate_string(&config, &translation, Some(&base));
+    if errs.iter().any(|e| e.critical) {
+        ValidationResult {
+            errors: errs,
+            normalized: None,
+        }
+    } else {
+        sanitize_whitespace(&mut translation);
+        normalize_string(&config.get_dialect(), &mut translation);
+        ValidationResult {
+            errors: errs,
+            normalized: Some(translation.compile()),
+        }
+    }
 }
 
 fn remove_ascii_ctrl(t: &mut String) {

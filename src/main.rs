@@ -8,8 +8,8 @@ mod validate;
 #[command(version, about, long_about = None)]
 struct Args {
     base: String,
-    case: String,
-    translation: String,
+    translation: Option<String>,
+    case: Option<String>,
 
     #[clap(short, long, default_value_t = String::from("openttd"))]
     dialect: String,
@@ -17,7 +17,7 @@ struct Args {
     cases: Vec<String>,
     #[clap(short, long)]
     genders: Vec<String>,
-    #[clap(short, long, default_value_t = 1)]
+    #[clap(short, long, default_value_t = 2)]
     plural_count: usize,
 }
 
@@ -30,11 +30,23 @@ fn main() {
         plural_count: args.plural_count,
     };
 
-    let result = validate::validate(config, args.base, args.case, args.translation);
+    let result = match args.translation {
+        Some(translation) => validate::validate_translation(config, args.base, args.case.unwrap_or(String::from("")), translation),
+        None => validate::validate_base(config, args.base),
+    };
 
-    if let Some(error) = result {
-        println!("Validation failed: {}", error.message);
-    } else {
-        println!("Validation succeeded");
+    for err in &result.errors {
+        let sev = if err.critical { "ERROR" } else { "WARNING" };
+        let pos = err
+            .position
+            .map_or(String::new(), |p| format!(" at byte {}", p));
+        println!("{}{}: {}", sev, pos, err.message);
+        if let Some(hint) = &err.suggestion {
+            println!("HINT: {}", hint);
+        }
+    }
+
+    if let Some(normalized) = result.normalized {
+        println!("NORMALIZED:{}", normalized);
     }
 }
