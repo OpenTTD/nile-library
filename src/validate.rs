@@ -21,12 +21,7 @@ pub struct ValidationError {
 
 impl LanguageConfig {
     fn get_dialect(&self) -> Dialect {
-        match self.dialect.as_str() {
-            "newgrf" => Dialect::NEWGRF,
-            "game-script" => Dialect::GAMESCRIPT,
-            "openttd" => Dialect::OPENTTD,
-            _ => panic!(),
-        }
+        self.dialect.as_str().into()
     }
 
     pub fn allow_cases(&self) -> bool {

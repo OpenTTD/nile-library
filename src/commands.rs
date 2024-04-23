@@ -17,6 +17,27 @@ pub enum Dialect {
     OPENTTD,
 }
 
+impl From<&str> for Dialect {
+    fn from(src: &str) -> Self {
+        match src {
+            "newgrf" => Dialect::NEWGRF,
+            "game-script" => Dialect::GAMESCRIPT,
+            "openttd" => Dialect::OPENTTD,
+            _ => panic!(),
+        }
+    }
+}
+
+impl Into<String> for Dialect {
+    fn into(self) -> String {
+        match self {
+            Dialect::NEWGRF => String::from("newgrf"),
+            Dialect::GAMESCRIPT => String::from("game-script"),
+            Dialect::OPENTTD => String::from("openttd"),
+        }
+    }
+}
+
 pub struct CommandInfo<'a> {
     pub name: &'a str,
     pub norm_name: Option<&'a str>,
