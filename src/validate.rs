@@ -28,6 +28,14 @@ impl LanguageConfig {
             _ => panic!(),
         }
     }
+
+    pub fn allow_cases(&self) -> bool {
+        self.get_dialect() != Dialect::GAMESCRIPT
+    }
+
+    fn allow_genders(&self) -> bool {
+        self.get_dialect() != Dialect::GAMESCRIPT
+    }
 }
 
 /**
@@ -164,14 +172,6 @@ fn get_signature(
     }
 }
 
-fn allow_cases(dialect: &Dialect) -> bool {
-    *dialect != Dialect::GAMESCRIPT
-}
-
-fn allow_genders(dialect: &Dialect) -> bool {
-    *dialect != Dialect::GAMESCRIPT
-}
-
 fn validate_string(
     config: &LanguageConfig,
     test: &ParsedString,
@@ -223,7 +223,7 @@ fn validate_string(
                         });
                     }
                     if let Some(c) = &cmd.case {
-                        if !allow_cases(&dialect) {
+                        if !config.allow_cases() {
                             errors.push(ValidationError {
                                 critical: true,
                                 position: Some(fragment.position),
@@ -323,7 +323,7 @@ fn validate_string(
                 front = 2;
             }
             FragmentContent::Gender(g) => {
-                if !allow_genders(&dialect) || config.genders.len() < 2 {
+                if !config.allow_genders() || config.genders.len() < 2 {
                     errors.push(ValidationError {
                         critical: true,
                         position: Some(fragment.position),
@@ -374,7 +374,7 @@ fn validate_string(
                     _ => panic!(),
                 };
                 let opt_ref_pos = cmd.indexref.or(opt_ref_pos);
-                if cmd.name == "G" && (!allow_genders(&dialect) || config.genders.len() < 2) {
+                if cmd.name == "G" && (!config.allow_genders() || config.genders.len() < 2) {
                     errors.push(ValidationError {
                         critical: true,
                         position: Some(fragment.position),
