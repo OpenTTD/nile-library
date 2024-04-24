@@ -39,6 +39,12 @@ pub struct ParsedString {
     pub fragments: Vec<StringFragment>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ParserError {
+    pub position: usize,
+    pub message: String,
+}
+
 impl StringCommand {
     fn parse(string: &str) -> Option<StringCommand> {
         let pat_command =
@@ -146,7 +152,7 @@ impl FragmentContent {
 }
 
 impl ParsedString {
-    pub fn parse(string: &str) -> Result<ParsedString, String> {
+    pub fn parse(string: &str) -> Result<ParsedString, ParserError> {
         let mut result = ParsedString {
             fragments: Vec::new(),
         };
@@ -171,11 +177,19 @@ impl ParsedString {
                             position: position,
                             content: content,
                         }),
-                        Err(message) => return Err(message),
+                        Err(message) => {
+                            return Err(ParserError {
+                                position: position,
+                                message: message,
+                            });
+                        }
                     };
                     position += end + 1
                 } else {
-                    return Err(String::from("Unterminated string command, '}' expected."));
+                    return Err(ParserError {
+                        position: position,
+                        message: String::from("Unterminated string command, '}' expected."),
+                    });
                 }
             } else {
                 result.fragments.push(StringFragment {
@@ -601,6 +615,12 @@ mod tests {
     #[test]
     fn test_parse_str_err() {
         let case1 = ParsedString::parse("{G=n}{ORANGE OpenTTD");
-        assert!(case1.is_err());
+        assert_eq!(
+            case1.err(),
+            Some(ParserError {
+                position: 5,
+                message: String::from("Unterminated string command, '}' expected."),
+            })
+        );
     }
 }

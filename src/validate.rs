@@ -53,8 +53,8 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: None,
-                    message: err,
+                    position: Some(err.position),
+                    message: err.message,
                     suggestion: None,
                 }],
                 normalized: None,
@@ -136,8 +136,8 @@ pub fn validate_translation(
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: None,
-                    message: err,
+                    position: Some(err.position),
+                    message: err.message,
                     suggestion: None,
                 }],
                 normalized: None,
