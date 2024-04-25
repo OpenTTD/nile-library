@@ -82,7 +82,7 @@ fn validate_translation(config: LanguageConfig, base: String, case: String, tran
 * `config.genders`: `gender` from `nile-config`.
 * `config.plural_count`: Number of plural forms from `nile-config`.
 * `base`: Base string the translation is for.
-* `case`: Case for the translation. `""` and `"default"` are both valid for the default case.
+* `case`: Case for the translation. Use `"default"` for the default case.
 * `translation`: The text entered by the translator.
 
 **Output:**

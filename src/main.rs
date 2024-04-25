@@ -34,7 +34,7 @@ fn main() {
         Some(translation) => validate::validate_translation(
             config,
             args.base,
-            args.case.unwrap_or(String::from("")),
+            args.case.unwrap_or(String::from("default")),
             translation,
         ),
         None => validate::validate_base(config, args.base),

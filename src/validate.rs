@@ -85,7 +85,7 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
  *
  * @param config The language configuration to validate against.
  * @param base The base string to validate against.
- * @param case The case of the translation. Use "" or "default" for the default case.
+ * @param case The case of the translation. Use "default" for the default case.
  * @param translation The translation to validate.
  *
  * @returns A normalized form of the translation, and a list of error messages, if the translation is invalid.
@@ -111,7 +111,7 @@ pub fn validate_translation(
         }
         Ok(parsed) => parsed,
     };
-    if case != "" && case != "default" {
+    if case != "default" {
         if !config.allow_cases() {
             return ValidationResult {
                 errors: vec![ValidationError {
