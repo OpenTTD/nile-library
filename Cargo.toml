@@ -2,6 +2,8 @@
 name = "nile-library"
 version = "0.0.0-git"
 edition = "2021"
+license = "MIT"
+description = "Library supporting nile"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
