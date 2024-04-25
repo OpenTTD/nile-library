@@ -1,6 +1,6 @@
 # nile-library - Library supporting nile
 
-This repository contains the libirary that supports OpenTTD's translation tool `nile`.
+This repository contains the library that supports OpenTTD's translation tool `nile`.
 
 This library for example validates if a translation is valid for a given base-string, and converts base-strings into a translatable form.
 
