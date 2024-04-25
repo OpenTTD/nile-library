@@ -1,8 +1,8 @@
-# nile - String Validator
+# nile-library - Library supporting nile
 
-This repository contains OpenTTD's translation string validator for `nile`.
+This repository contains the libirary that supports OpenTTD's translation tool `nile`.
 
-This tool validates if a translation is valid for a given base-string, by following all the (sometimes complex) rules for OpenTTD.
+This library for example validates if a translation is valid for a given base-string, and converts base-strings into a translatable form.
 
 ## Installation
 
