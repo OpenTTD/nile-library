@@ -14,7 +14,8 @@ pub struct LanguageConfig {
 #[derive(Serialize, Debug, PartialEq)]
 pub struct ValidationError {
     pub critical: bool, //< true: translation is broken, do not commit. false: translation has minor issues, but is probably better than no translation
-    pub position: Option<usize>, //< byte offset in input string
+    pub pos_begin: Option<usize>, //< byte offset in input string
+    pub pos_end: Option<usize>,
     pub message: String,
     pub suggestion: Option<String>,
 }
@@ -53,7 +54,8 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: Some(err.position),
+                    pos_begin: Some(err.pos_begin),
+                    pos_end: err.pos_end,
                     message: err.message,
                     suggestion: None,
                 }],
@@ -99,7 +101,8 @@ pub fn validate_translation(
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("Base language text is invalid."),
                     suggestion: Some(String::from("This is a bug; wait until it is fixed.")),
                 }],
@@ -113,7 +116,8 @@ pub fn validate_translation(
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("No cases allowed."),
                     suggestion: None,
                 }],
@@ -123,7 +127,8 @@ pub fn validate_translation(
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: format!("Unknown case '{}'.", case),
                     suggestion: Some(format!("Known cases are: '{}'", config.cases.join("', '"))),
                 }],
@@ -136,7 +141,8 @@ pub fn validate_translation(
             return ValidationResult {
                 errors: vec![ValidationError {
                     critical: true,
-                    position: Some(err.position),
+                    pos_begin: Some(err.pos_begin),
+                    pos_end: err.pos_end,
                     message: err.message,
                     suggestion: None,
                 }],
@@ -225,7 +231,8 @@ fn get_signature(
                     if let Some(index) = cmd.index {
                         errors.push(ValidationError {
                             critical: true,
-                            position: Some(fragment.position),
+                            pos_begin: Some(fragment.pos_begin),
+                            pos_end: Some(fragment.pos_end),
                             message: format!(
                                 "Command '{{{}}}' cannot have a position reference.",
                                 cmd.name
@@ -248,7 +255,8 @@ fn get_signature(
                     if let Some(existing) = signature.parameters.insert(pos, info) {
                         errors.push(ValidationError {
                             critical: true,
-                            position: Some(fragment.position),
+                            pos_begin: Some(fragment.pos_begin),
+                            pos_end: Some(fragment.pos_end),
                             message: format!(
                                 "Command '{{{}:{}}}' references the same position as '{{{}:{}}}' before.",
                                 pos, cmd.name, pos, existing.name
@@ -261,7 +269,8 @@ fn get_signature(
             } else {
                 errors.push(ValidationError {
                     critical: true,
-                    position: Some(fragment.position),
+                    pos_begin: Some(fragment.pos_begin),
+                    pos_end: Some(fragment.pos_end),
                     message: format!("Unknown string command '{{{}}}'.", cmd.name),
                     suggestion: None,
                 });
@@ -289,7 +298,8 @@ fn validate_string(
             if base.is_some() {
                 return vec![ValidationError {
                     critical: true,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("Base language text is invalid."),
                     suggestion: Some(String::from("This is a bug; wait until it is fixed.")),
                 }];
@@ -321,7 +331,8 @@ fn validate_string(
                     if info.front_only && front == 2 {
                         errors.push(ValidationError {
                             critical: false,
-                            position: Some(fragment.position),
+                            pos_begin: Some(fragment.pos_begin),
+                            pos_end: Some(fragment.pos_end),
                             message: format!("Command '{{{}}}' must be at the front.", cmd.name),
                             suggestion: None,
                         });
@@ -330,14 +341,16 @@ fn validate_string(
                         if !config.allow_cases() {
                             errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: String::from("No case selections allowed."),
                                 suggestion: Some(format!("Remove '.{}'.", c)),
                             });
                         } else if !info.allow_case {
                             errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!(
                                     "No case selection allowed for '{{{}}}'.",
                                     cmd.name
@@ -347,7 +360,8 @@ fn validate_string(
                         } else if !config.cases.contains(&c) {
                             errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!("Unknown case '{}'.", c),
                                 suggestion: Some(format!(
                                     "Known cases are: '{}'",
@@ -361,7 +375,8 @@ fn validate_string(
                         if let Some(index) = cmd.index {
                             errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!(
                                     "Command '{{{}}}' cannot have a position reference.",
                                     cmd.name
@@ -384,7 +399,8 @@ fn validate_string(
                         if !used_parameters.insert(pos) {
                             errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!("Duplicate parameter '{{{}:{}}}'.", pos, cmd.name),
                                 suggestion: None,
                             });
@@ -393,7 +409,8 @@ fn validate_string(
                         match opt_expected {
                             None => errors.push(ValidationError {
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!(
                                     "There is no parameter in position {}, found '{{{}}}'.",
                                     pos, cmd.name
@@ -403,7 +420,8 @@ fn validate_string(
                             Some(expected) if expected.get_norm_name() != info.get_norm_name() => {
                                 errors.push(ValidationError {
                                     critical: true,
-                                    position: Some(fragment.position),
+                                    pos_begin: Some(fragment.pos_begin),
+                                    pos_end: Some(fragment.pos_end),
                                     message: format!(
                                         "Expected '{{{}:{}}}', found '{{{}}}'.",
                                         pos, expected.name, cmd.name
@@ -419,7 +437,8 @@ fn validate_string(
                 } else {
                     errors.push(ValidationError {
                         critical: true,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: format!("Unknown string command '{{{}}}'.", cmd.name),
                         suggestion: None,
                     });
@@ -430,14 +449,16 @@ fn validate_string(
                 if !config.allow_genders() || config.genders.len() < 2 {
                     errors.push(ValidationError {
                         critical: true,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: String::from("No gender definitions allowed."),
                         suggestion: Some(String::from("Remove '{G=...}'.")),
                     });
                 } else if front == 2 {
                     errors.push(ValidationError {
                         critical: false,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: String::from("Gender definitions must be at the front."),
                         suggestion: Some(String::from(
                             "Move '{G=...}' to the front of the translation.",
@@ -446,7 +467,8 @@ fn validate_string(
                 } else if front == 1 {
                     errors.push(ValidationError {
                         critical: false,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: String::from("Duplicate gender definition."),
                         suggestion: Some(String::from("Remove the second '{G=...}'.")),
                     });
@@ -455,7 +477,8 @@ fn validate_string(
                     if !config.genders.contains(&g.gender) {
                         errors.push(ValidationError {
                             critical: true,
-                            position: Some(fragment.position),
+                            pos_begin: Some(fragment.pos_begin),
+                            pos_end: Some(fragment.pos_end),
                             message: format!("Unknown gender '{}'.", g.gender),
                             suggestion: Some(format!(
                                 "Known genders are: '{}'",
@@ -481,14 +504,16 @@ fn validate_string(
                 if cmd.name == "G" && (!config.allow_genders() || config.genders.len() < 2) {
                     errors.push(ValidationError {
                         critical: true,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: String::from("No gender choices allowed."),
                         suggestion: Some(String::from("Remove '{G ...}'.")),
                     });
                 } else if cmd.name == "P" && config.plural_count < 2 {
                     errors.push(ValidationError {
                         critical: true,
-                        position: Some(fragment.position),
+                        pos_begin: Some(fragment.pos_begin),
+                        pos_end: Some(fragment.pos_end),
                         message: String::from("No plural choices allowed."),
                         suggestion: Some(String::from("Remove '{P ...}'.")),
                     });
@@ -498,7 +523,8 @@ fn validate_string(
                             if cmd.choices.len() != config.plural_count {
                                 errors.push(ValidationError {
                                     critical: true,
-                                    position: Some(fragment.position),
+                                    pos_begin: Some(fragment.pos_begin),
+                                    pos_end: Some(fragment.pos_end),
                                     message: format!(
                                         "Expected {} plural choices, found {}.",
                                         config.plural_count,
@@ -512,7 +538,8 @@ fn validate_string(
                             if cmd.choices.len() != config.genders.len() {
                                 errors.push(ValidationError {
                                     critical: true,
-                                    position: Some(fragment.position),
+                                    pos_begin: Some(fragment.pos_begin),
+                                    pos_end: Some(fragment.pos_end),
                                     message: format!(
                                         "Expected {} gender choices, found {}.",
                                         config.genders.len(),
@@ -544,7 +571,8 @@ fn validate_string(
                                     if !par_info.allow_plural {
                                         errors.push(ValidationError{
                                             critical: true,
-                                            position: Some(fragment.position),
+                                            pos_begin: Some(fragment.pos_begin),
+                                            pos_end: Some(fragment.pos_end),
                                             message: format!(
                                                 "'{{{}}}' references position '{}:{}', but '{{{}:{}}}' does not allow plurals.",
                                                 cmd.name, ref_pos, ref_subpos, ref_pos, ref_norm_name
@@ -557,7 +585,8 @@ fn validate_string(
                                     if !par_info.allow_gender {
                                         errors.push(ValidationError{
                                             critical: true,
-                                            position: Some(fragment.position),
+                                            pos_begin: Some(fragment.pos_begin),
+                                            pos_end: Some(fragment.pos_end),
                                             message: format!(
                                                 "'{{{}}}' references position '{}:{}', but '{{{}:{}}}' does not allow genders.",
                                                 cmd.name, ref_pos, ref_subpos, ref_pos, ref_norm_name
@@ -571,7 +600,8 @@ fn validate_string(
                         } else {
                             errors.push(ValidationError{
                                 critical: true,
-                                position: Some(fragment.position),
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
                                 message: format!(
                                     "'{{{}}}' references position '{}:{}', but '{{{}:{}}}' only has {} subindices.",
                                     cmd.name, ref_pos, ref_subpos, ref_pos, ref_norm_name, ref_info.parameters.len()
@@ -582,7 +612,8 @@ fn validate_string(
                     } else {
                         errors.push(ValidationError {
                             critical: true,
-                            position: Some(fragment.position),
+                            pos_begin: Some(fragment.pos_begin),
+                            pos_end: Some(fragment.pos_end),
                             message: format!(
                                 "'{{{}}}' references position '{}', which has no parameter.",
                                 cmd.name,
@@ -611,7 +642,8 @@ fn validate_string(
             let norm_name = info.get_norm_name();
             errors.push(ValidationError {
                 critical: true,
-                position: None,
+                pos_begin: None,
+                pos_end: None,
                 message: format!("String command '{{{}:{}}}' is missing.", pos, norm_name),
                 suggestion: None,
             });
@@ -623,14 +655,16 @@ fn validate_string(
         if *occurence != Occurence::ANY && found_count == 0 {
             errors.push(ValidationError {
                 critical: false,
-                position: None,
+                pos_begin: None,
+                pos_end: None,
                 message: format!("String command '{{{}}}' is missing.", norm_name),
                 suggestion: None,
             });
         } else if *occurence == Occurence::EXACT && *ex_count != found_count {
             errors.push(ValidationError {
                 critical: false,
-                position: None,
+                pos_begin: None,
+                pos_end: None,
                 message: format!(
                     "String command '{{{}}}': expected {} times, found {} times.",
                     norm_name, ex_count, found_count
@@ -643,7 +677,8 @@ fn validate_string(
         if *occurence != Occurence::ANY && signature.nonpositional_count.get(norm_name).is_none() {
             errors.push(ValidationError {
                 critical: false,
-                position: None,
+                pos_begin: None,
+                pos_end: None,
                 message: format!("String command '{{{}}}' is unexpected.", norm_name),
                 suggestion: Some(String::from("Remove this command.")),
             });
@@ -777,7 +812,8 @@ mod tests {
             err[0],
             ValidationError {
                 critical: true,
-                position: Some(5),
+                pos_begin: Some(5),
+                pos_end: Some(14),
                 message: String::from(
                     "Command '{0:COMMA}' references the same position as '{0:NUM}' before."
                 ),
@@ -801,7 +837,8 @@ mod tests {
             err[0],
             ValidationError {
                 critical: true,
-                position: Some(0),
+                pos_begin: Some(0),
+                pos_end: Some(12),
                 message: String::from("Unknown string command '{RAW_STRING}'."),
                 suggestion: None,
             }
@@ -817,7 +854,8 @@ mod tests {
             err[0],
             ValidationError {
                 critical: true,
-                position: Some(0),
+                pos_begin: Some(0),
+                pos_end: Some(8),
                 message: String::from("Unknown string command '{FOOBAR}'."),
                 suggestion: None,
             }
@@ -833,7 +871,8 @@ mod tests {
             err[0],
             ValidationError {
                 critical: true,
-                position: Some(0),
+                pos_begin: Some(0),
+                pos_end: Some(7),
                 message: String::from("Command '{RED}' cannot have a position reference."),
                 suggestion: Some(String::from("Remove '1:'.")),
             }
@@ -873,7 +912,8 @@ mod tests {
             val_base[0],
             ValidationError {
                 critical: true,
-                position: Some(0),
+                pos_begin: Some(0),
+                pos_end: Some(8),
                 message: String::from("Unknown string command '{FOOBAR}'."),
                 suggestion: None,
             }
@@ -885,7 +925,8 @@ mod tests {
             val_trans[0],
             ValidationError {
                 critical: true,
-                position: None,
+                pos_begin: None,
+                pos_end: None,
                 message: String::from("Base language text is invalid."),
                 suggestion: Some(String::from("This is a bug; wait until it is fixed.")),
             }
@@ -917,7 +958,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(8),
                     message: String::from("Unknown string command '{FOOBAR}'."),
                     suggestion: None,
                 }
@@ -931,7 +973,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(7),
                     message: String::from("There is no parameter in position 1, found '{NUM}'."),
                     suggestion: None,
                 }
@@ -940,7 +983,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{0:NUM}' is missing."),
                     suggestion: None,
                 }
@@ -954,7 +998,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(7),
                     message: String::from("Expected '{0:NUM}', found '{COMMA}'."),
                     suggestion: None,
                 }
@@ -968,7 +1013,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(7),
+                    pos_begin: Some(7),
+                    pos_end: Some(14),
                     message: String::from("Duplicate parameter '{0:NUM}'."),
                     suggestion: None,
                 }
@@ -1001,7 +1047,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: false,
-                    position: Some(5),
+                    pos_begin: Some(5),
+                    pos_end: Some(10),
                     message: String::from("Duplicate gender definition."),
                     suggestion: Some(String::from("Remove the second '{G=...}'.")),
                 }
@@ -1015,7 +1062,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: false,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(15),
                     message: String::from("Gender definitions must be at the front."),
                     suggestion: Some(String::from(
                         "Move '{G=...}' to the front of the translation."
@@ -1031,7 +1079,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: false,
-                    position: Some(3),
+                    pos_begin: Some(3),
+                    pos_end: Some(13),
                     message: String::from("Command '{BIG_FONT}' must be at the front."),
                     suggestion: None,
                 }
@@ -1045,7 +1094,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: false,
-                    position: Some(3),
+                    pos_begin: Some(3),
+                    pos_end: Some(8),
                     message: String::from("Gender definitions must be at the front."),
                     suggestion: Some(String::from(
                         "Move '{G=...}' to the front of the translation."
@@ -1056,7 +1106,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{BIG_FONT}' is missing."),
                     suggestion: None,
                 }
@@ -1089,7 +1140,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(7),
                     message: String::from("Command '{RED}' cannot have a position reference."),
                     suggestion: Some(String::from("Remove '2:'.")),
                 }
@@ -1098,7 +1150,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(7),
+                    pos_begin: Some(7),
+                    pos_end: Some(19),
                     message: String::from("Unknown case 'z'."),
                     suggestion: Some(String::from("Known cases are: 'x', 'y'")),
                 }
@@ -1107,7 +1160,8 @@ mod tests {
                 val_trans[2],
                 ValidationError {
                     critical: true,
-                    position: Some(19),
+                    pos_begin: Some(19),
+                    pos_end: Some(28),
                     message: String::from("No case selection allowed for '{NUM}'."),
                     suggestion: Some(String::from("Remove '.x'.")),
                 }
@@ -1126,7 +1180,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(19),
                     message: String::from(
                         "'{G}' references position '0:0', but '{0:NUM}' does not allow genders."
                     ),
@@ -1137,7 +1192,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(19),
+                    pos_begin: Some(19),
+                    pos_end: Some(28),
                     message: String::from(
                         "'{P}' references position '1:0', but '{1:STRING}' does not allow plurals."
                     ),
@@ -1158,7 +1214,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(21),
                     message: String::from(
                         "'{G}' references position '1:4', but '{1:STRING}' only has 4 subindices."
                     ),
@@ -1169,7 +1226,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(21),
+                    pos_begin: Some(21),
+                    pos_end: Some(32),
                     message: String::from(
                         "'{P}' references position '1:4', but '{1:STRING}' only has 4 subindices."
                     ),
@@ -1185,7 +1243,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(19),
                     message: String::from("'{G}' references position '2', which has no parameter."),
                     suggestion: None,
                 }
@@ -1194,7 +1253,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(19),
+                    pos_begin: Some(19),
+                    pos_end: Some(28),
                     message: String::from("'{P}' references position '2', which has no parameter."),
                     suggestion: None,
                 }
@@ -1208,7 +1268,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(5),
+                    pos_begin: Some(5),
+                    pos_end: Some(12),
                     message: String::from(
                         "'{P}' references position '-1', which has no parameter."
                     ),
@@ -1219,7 +1280,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(27),
+                    pos_begin: Some(27),
+                    pos_end: Some(34),
                     message: String::from("'{G}' references position '2', which has no parameter."),
                     suggestion: Some(String::from("Add a position reference.")),
                 }
@@ -1247,7 +1309,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(5),
                     message: String::from("No gender definitions allowed."),
                     suggestion: Some(String::from("Remove '{G=...}'.")),
                 }
@@ -1256,7 +1319,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(15),
                     message: String::from("No plural choices allowed."),
                     suggestion: Some(String::from("Remove '{P ...}'.")),
                 }
@@ -1265,7 +1329,8 @@ mod tests {
                 val_trans[2],
                 ValidationError {
                     critical: true,
-                    position: Some(15),
+                    pos_begin: Some(15),
+                    pos_end: Some(20),
                     message: String::from("No gender choices allowed."),
                     suggestion: Some(String::from("Remove '{G ...}'.")),
                 }
@@ -1293,7 +1358,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(5),
                     message: String::from("No gender definitions allowed."),
                     suggestion: Some(String::from("Remove '{G=...}'.")),
                 }
@@ -1302,7 +1368,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(17),
+                    pos_begin: Some(17),
+                    pos_end: Some(24),
                     message: String::from("No gender choices allowed."),
                     suggestion: Some(String::from("Remove '{G ...}'.")),
                 }
@@ -1311,7 +1378,8 @@ mod tests {
                 val_trans[2],
                 ValidationError {
                     critical: true,
-                    position: Some(24),
+                    pos_begin: Some(24),
+                    pos_end: Some(34),
                     message: String::from("No case selections allowed."),
                     suggestion: Some(String::from("Remove '.x'.")),
                 }
@@ -1344,7 +1412,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: true,
-                    position: Some(0),
+                    pos_begin: Some(0),
+                    pos_end: Some(5),
                     message: String::from("Unknown gender 'c'."),
                     suggestion: Some(String::from("Known genders are: 'a', 'b'")),
                 }
@@ -1353,7 +1422,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: true,
-                    position: Some(10),
+                    pos_begin: Some(10),
+                    pos_end: Some(19),
                     message: String::from("Expected 2 plural choices, found 3."),
                     suggestion: None,
                 }
@@ -1362,7 +1432,8 @@ mod tests {
                 val_trans[2],
                 ValidationError {
                     critical: true,
-                    position: Some(19),
+                    pos_begin: Some(19),
+                    pos_end: Some(28),
                     message: String::from("Expected 2 gender choices, found 3."),
                     suggestion: None,
                 }
@@ -1371,7 +1442,8 @@ mod tests {
                 val_trans[3],
                 ValidationError {
                     critical: true,
-                    position: Some(28),
+                    pos_begin: Some(28),
+                    pos_end: Some(38),
                     message: String::from("Unknown case 'z'."),
                     suggestion: Some(String::from("Known cases are: 'x', 'y'")),
                 }
@@ -1411,7 +1483,8 @@ mod tests {
                 val_trans[0],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{}': expected 2 times, found 1 times."),
                     suggestion: None,
                 }
@@ -1420,7 +1493,8 @@ mod tests {
                 val_trans[1],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{GREEN}' is missing."),
                     suggestion: None,
                 }
@@ -1429,7 +1503,8 @@ mod tests {
                 val_trans[2],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from(
                         "String command '{TRAIN}': expected 1 times, found 2 times."
                     ),
@@ -1440,7 +1515,8 @@ mod tests {
                 val_trans[3],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{BLUE}' is unexpected."),
                     suggestion: Some(String::from("Remove this command.")),
                 }
@@ -1449,7 +1525,8 @@ mod tests {
                 val_trans[4],
                 ValidationError {
                     critical: false,
-                    position: None,
+                    pos_begin: None,
+                    pos_end: None,
                     message: String::from("String command '{SHIP}' is unexpected."),
                     suggestion: Some(String::from("Remove this command.")),
                 }

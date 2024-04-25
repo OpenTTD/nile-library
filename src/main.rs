@@ -42,10 +42,13 @@ fn main() {
 
     for err in &result.errors {
         let sev = if err.critical { "ERROR" } else { "WARNING" };
-        let pos = err
-            .position
+        let pos_begin = err
+            .pos_begin
             .map_or(String::new(), |p| format!(" at byte {}", p));
-        println!("{}{}: {}", sev, pos, err.message);
+        let pos_end = err
+            .pos_end
+            .map_or(String::new(), |p| format!(" to {}", p));
+        println!("{}{}{}: {}", sev, pos_begin, pos_end, err.message);
         if let Some(hint) = &err.suggestion {
             println!("HINT: {}", hint);
         }

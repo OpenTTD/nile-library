@@ -30,7 +30,8 @@ pub enum FragmentContent {
 
 #[derive(Debug, PartialEq)]
 pub struct StringFragment {
-    pub position: usize,
+    pub pos_begin: usize,
+    pub pos_end: usize,
     pub content: FragmentContent,
 }
 
@@ -41,7 +42,8 @@ pub struct ParsedString {
 
 #[derive(Debug, PartialEq)]
 pub struct ParserError {
-    pub position: usize,
+    pub pos_begin: usize,
+    pub pos_end: Option<usize>,
     pub message: String,
 }
 
@@ -164,7 +166,8 @@ impl ParsedString {
                     let text: &str;
                     (text, rest) = rest.split_at(start);
                     result.fragments.push(StringFragment {
-                        position: position,
+                        pos_begin: position,
+                        pos_end: position + start,
                         content: FragmentContent::Text(String::from(text)),
                     });
                 }
@@ -174,12 +177,14 @@ impl ParsedString {
                     (text, rest) = rest.split_at(end + 1);
                     match FragmentContent::parse(text) {
                         Ok(content) => result.fragments.push(StringFragment {
-                            position: position,
+                            pos_begin: position,
+                            pos_end: position + end + 1,
                             content: content,
                         }),
                         Err(message) => {
                             return Err(ParserError {
-                                position: position,
+                                pos_begin: position,
+                                pos_end: Some(position + end + 1),
                                 message: message,
                             });
                         }
@@ -187,13 +192,15 @@ impl ParsedString {
                     position += end + 1
                 } else {
                     return Err(ParserError {
-                        position: position,
+                        pos_begin: position,
+                        pos_end: None,
                         message: String::from("Unterminated string command, '}' expected."),
                     });
                 }
             } else {
                 result.fragments.push(StringFragment {
-                    position: position,
+                    pos_begin: position,
+                    pos_end: position + rest.len(),
                     content: FragmentContent::Text(String::from(rest)),
                 });
                 break;
@@ -583,13 +590,15 @@ mod tests {
             case1.fragments,
             vec![
                 StringFragment {
-                    position: 0,
+                    pos_begin: 0,
+                    pos_end: 5,
                     content: FragmentContent::Gender(GenderDefinition {
                         gender: String::from("n")
                     })
                 },
                 StringFragment {
-                    position: 5,
+                    pos_begin: 5,
+                    pos_end: 13,
                     content: FragmentContent::Command(StringCommand {
                         index: None,
                         name: String::from("ORANGE"),
@@ -597,11 +606,13 @@ mod tests {
                     })
                 },
                 StringFragment {
-                    position: 13,
+                    pos_begin: 13,
+                    pos_end: 21,
                     content: FragmentContent::Text(String::from("OpenTTD "))
                 },
                 StringFragment {
-                    position: 21,
+                    pos_begin: 21,
+                    pos_end: 29,
                     content: FragmentContent::Command(StringCommand {
                         index: None,
                         name: String::from("STRING"),
@@ -618,7 +629,8 @@ mod tests {
         assert_eq!(
             case1.err(),
             Some(ParserError {
-                position: 5,
+                pos_begin: 5,
+                pos_end: None,
                 message: String::from("Unterminated string command, '}' expected."),
             })
         );
