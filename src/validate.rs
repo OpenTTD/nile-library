@@ -13,7 +13,7 @@ pub struct LanguageConfig {
 
 #[derive(Debug, PartialEq)]
 pub enum Severity {
-    Error, //< translation is broken, do not commit.
+    Error,   //< translation is broken, do not commit.
     Warning, //< translation has minor issues, but is probably better than no translation.
 }
 

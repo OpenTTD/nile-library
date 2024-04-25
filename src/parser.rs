@@ -586,7 +586,9 @@ mod tests {
 
     #[test]
     fn test_parse_str_ok() {
-        let case1 = ParsedString::parse("{G=n}{ORANGE}\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} {STRING}");
+        let case1 = ParsedString::parse(
+            "{G=n}{ORANGE}\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} {STRING}",
+        );
         assert!(case1.is_ok());
         let case1 = case1.unwrap();
         assert_eq!(
@@ -611,7 +613,9 @@ mod tests {
                 StringFragment {
                     pos_begin: 13,
                     pos_end: 21,
-                    content: FragmentContent::Text(String::from("\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} "))
+                    content: FragmentContent::Text(String::from(
+                        "\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} "
+                    ))
                 },
                 StringFragment {
                     pos_begin: 21,
