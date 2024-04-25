@@ -159,48 +159,51 @@ impl ParsedString {
             fragments: Vec::new(),
         };
         let mut rest: &str = string;
-        let mut position: usize = 0;
+        let mut pos_code: usize = 0;
         while !rest.is_empty() {
             if let Some(start) = rest.find('{') {
                 if start > 0 {
                     let text: &str;
                     (text, rest) = rest.split_at(start);
+                    let len_code = text.chars().count();
                     result.fragments.push(StringFragment {
-                        pos_begin: position,
-                        pos_end: position + start,
+                        pos_begin: pos_code,
+                        pos_end: pos_code + len_code,
                         content: FragmentContent::Text(String::from(text)),
                     });
+                    pos_code += len_code;
                 }
-                position += start;
                 if let Some(end) = rest.find('}') {
                     let text: &str;
                     (text, rest) = rest.split_at(end + 1);
+                    let len_code = text.chars().count();
                     match FragmentContent::parse(text) {
                         Ok(content) => result.fragments.push(StringFragment {
-                            pos_begin: position,
-                            pos_end: position + end + 1,
+                            pos_begin: pos_code,
+                            pos_end: pos_code + len_code,
                             content: content,
                         }),
                         Err(message) => {
                             return Err(ParserError {
-                                pos_begin: position,
-                                pos_end: Some(position + end + 1),
+                                pos_begin: pos_code,
+                                pos_end: Some(pos_code + len_code),
                                 message: message,
                             });
                         }
                     };
-                    position += end + 1
+                    pos_code += len_code;
                 } else {
                     return Err(ParserError {
-                        pos_begin: position,
+                        pos_begin: pos_code,
                         pos_end: None,
                         message: String::from("Unterminated string command, '}' expected."),
                     });
                 }
             } else {
+                let len_code = rest.chars().count();
                 result.fragments.push(StringFragment {
-                    pos_begin: position,
-                    pos_end: position + rest.len(),
+                    pos_begin: pos_code,
+                    pos_end: pos_code + len_code,
                     content: FragmentContent::Text(String::from(rest)),
                 });
                 break;
@@ -583,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_parse_str_ok() {
-        let case1 = ParsedString::parse("{G=n}{ORANGE}OpenTTD {STRING}");
+        let case1 = ParsedString::parse("{G=n}{ORANGE}\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} {STRING}");
         assert!(case1.is_ok());
         let case1 = case1.unwrap();
         assert_eq!(
@@ -608,7 +611,7 @@ mod tests {
                 StringFragment {
                     pos_begin: 13,
                     pos_end: 21,
-                    content: FragmentContent::Text(String::from("OpenTTD "))
+                    content: FragmentContent::Text(String::from("\u{039f}\u{03c0}\u{03b7}\u{03bd}\u{03a4}\u{03a4}\u{0394} "))
                 },
                 StringFragment {
                     pos_begin: 21,

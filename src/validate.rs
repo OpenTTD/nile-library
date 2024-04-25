@@ -14,7 +14,7 @@ pub struct LanguageConfig {
 #[derive(Serialize, Debug, PartialEq)]
 pub struct ValidationError {
     pub critical: bool, //< true: translation is broken, do not commit. false: translation has minor issues, but is probably better than no translation
-    pub pos_begin: Option<usize>, //< byte offset in input string
+    pub pos_begin: Option<usize>, //< codepoint offset in input string
     pub pos_end: Option<usize>,
     pub message: String,
     pub suggestion: Option<String>,

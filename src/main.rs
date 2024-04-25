@@ -44,7 +44,7 @@ fn main() {
         let sev = if err.critical { "ERROR" } else { "WARNING" };
         let pos_begin = err
             .pos_begin
-            .map_or(String::new(), |p| format!(" at byte {}", p));
+            .map_or(String::new(), |p| format!(" at position {}", p));
         let pos_end = err
             .pos_end
             .map_or(String::new(), |p| format!(" to {}", p));
