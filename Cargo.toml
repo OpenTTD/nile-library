@@ -1,6 +1,6 @@
 [package]
-name = "nile-validator"
-version = "0.1.0"
+name = "nile-library"
+version = "0.0.0-git"
 edition = "2021"
 
 [lib]

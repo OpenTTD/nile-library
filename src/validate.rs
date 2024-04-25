@@ -24,10 +24,10 @@ pub struct ValidationError {
  * @returns A clear and specific error message if the translation is invalid. None otherwise.
  */
 pub fn validate(
-    config: LanguageConfig,
-    base: String,
-    case: String,
-    translation: String,
+    _config: LanguageConfig,
+    _base: String,
+    _case: String,
+    _translation: String,
 ) -> Option<ValidationError> {
     None
 }

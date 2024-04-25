@@ -1,0 +1,35 @@
+name: Release Crate
+
+on:
+  release:
+    types:
+    - published
+
+jobs:
+  registries:
+    name: Publish to Crates.io
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Set version
+      run: |
+        # Remove the "v" from the version.
+        VERSION=$(echo ${{ github.ref_name }} | cut -b2-)
+        echo "Version: ${VERSION}"
+
+        sed -i 's/version = "0.0.0-git"/version = "'${VERSION}'"/' Cargo.toml
+        sed -i 's/version = "0.0.0-git"/version = "'${VERSION}'"/' Cargo.lock
+
+    - name: Publish to crates.io
+      run: |
+        cargo publish --allow-dirty
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
