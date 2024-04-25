@@ -1,18 +1,27 @@
 use serde_wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
+mod commands;
+mod parser;
 mod validate;
 
 #[wasm_bindgen]
-pub fn validate(js_config: JsValue, base: String, case: String, translation: String) -> JsValue {
+pub fn validate_base(js_config: JsValue, base: String) -> JsValue {
     let config: validate::LanguageConfig = serde_wasm_bindgen::from_value(js_config).unwrap();
-    let response = validate::validate(config, base, case, translation);
+    let response = validate::validate_base(config, base);
+    serde_wasm_bindgen::to_value(&response).unwrap()
+}
 
-    if let Some(error) = response {
-        serde_wasm_bindgen::to_value(&error).unwrap()
-    } else {
-        JsValue::NULL
-    }
+#[wasm_bindgen]
+pub fn validate_translation(
+    js_config: JsValue,
+    base: String,
+    case: String,
+    translation: String,
+) -> JsValue {
+    let config: validate::LanguageConfig = serde_wasm_bindgen::from_value(js_config).unwrap();
+    let response = validate::validate_translation(config, base, case, translation);
+    serde_wasm_bindgen::to_value(&response).unwrap()
 }
 
 #[wasm_bindgen]
