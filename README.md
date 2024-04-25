@@ -87,9 +87,9 @@ fn validate_translation(config: LanguageConfig, base: String, case: String, tran
 
 **Output:**
 * `errors`: List of errors.
-    * `critical`: Severity of the error.
-        * `true`: The translation is broken, and must not be committed to OpenTTD.
-        * `false`: The translation is okay to commit, but translators should fix it anyway. This is used for new validations, which Eints did not do. So there are potentially lots of existing translations in violation.
+    * `severity`: Severity of the error.
+        * `error`: The translation is broken, and must not be committed to OpenTTD.
+        * `warning`: The translation is okay to commit, but translators should fix it anyway. This is used for new validations, which Eints did not do. So there are potentially lots of existing translations in violation.
     * `position`: Byte position in input string. `None`, if general message without location.
     * `message`: Error message.
     * `suggestion`: Some extended message with hints.

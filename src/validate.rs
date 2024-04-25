@@ -11,9 +11,15 @@ pub struct LanguageConfig {
     pub plural_count: usize,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Severity {
+    Error, //< translation is broken, do not commit.
+    Warning, //< translation has minor issues, but is probably better than no translation.
+}
+
 #[derive(Serialize, Debug, PartialEq)]
 pub struct ValidationError {
-    pub critical: bool, //< true: translation is broken, do not commit. false: translation has minor issues, but is probably better than no translation
+    pub severity: Severity,
     pub pos_begin: Option<usize>, //< codepoint offset in input string
     pub pos_end: Option<usize>,
     pub message: String,
@@ -40,6 +46,18 @@ impl LanguageConfig {
     }
 }
 
+impl Serialize for Severity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+        })
+    }
+}
+
 /**
  * Validate whether a base string is valid.
  *
@@ -53,7 +71,7 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
         Err(err) => {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(err.pos_begin),
                     pos_end: err.pos_end,
                     message: err.message,
@@ -65,7 +83,7 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
         Ok(parsed) => parsed,
     };
     let errs = validate_string(&config, &base, None);
-    if errs.iter().any(|e| e.critical) {
+    if errs.iter().any(|e| e.severity == Severity::Error) {
         ValidationResult {
             errors: errs,
             normalized: None,
@@ -100,7 +118,7 @@ pub fn validate_translation(
         Err(_) => {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("Base language text is invalid."),
@@ -115,7 +133,7 @@ pub fn validate_translation(
         if !config.allow_cases() {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("No cases allowed."),
@@ -126,7 +144,7 @@ pub fn validate_translation(
         } else if !config.cases.contains(&case) {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: None,
                     pos_end: None,
                     message: format!("Unknown case '{}'.", case),
@@ -140,7 +158,7 @@ pub fn validate_translation(
         Err(err) => {
             return ValidationResult {
                 errors: vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(err.pos_begin),
                     pos_end: err.pos_end,
                     message: err.message,
@@ -152,7 +170,7 @@ pub fn validate_translation(
         Ok(parsed) => parsed,
     };
     let errs = validate_string(&config, &translation, Some(&base));
-    if errs.iter().any(|e| e.critical) {
+    if errs.iter().any(|e| e.severity == Severity::Error) {
         ValidationResult {
             errors: errs,
             normalized: None,
@@ -230,7 +248,7 @@ fn get_signature(
                 if info.parameters.is_empty() {
                     if let Some(index) = cmd.index {
                         errors.push(ValidationError {
-                            critical: true,
+                            severity: Severity::Error,
                             pos_begin: Some(fragment.pos_begin),
                             pos_end: Some(fragment.pos_end),
                             message: format!(
@@ -254,7 +272,7 @@ fn get_signature(
                     }
                     if let Some(existing) = signature.parameters.insert(pos, info) {
                         errors.push(ValidationError {
-                            critical: true,
+                            severity: Severity::Error,
                             pos_begin: Some(fragment.pos_begin),
                             pos_end: Some(fragment.pos_end),
                             message: format!(
@@ -268,7 +286,7 @@ fn get_signature(
                 }
             } else {
                 errors.push(ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(fragment.pos_begin),
                     pos_end: Some(fragment.pos_end),
                     message: format!("Unknown string command '{{{}}}'.", cmd.name),
@@ -297,7 +315,7 @@ fn validate_string(
         Err(msgs) => {
             if base.is_some() {
                 return vec![ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("Base language text is invalid."),
@@ -330,7 +348,7 @@ fn validate_string(
                 if let Some(info) = opt_info {
                     if info.front_only && front == 2 {
                         errors.push(ValidationError {
-                            critical: false,
+                            severity: Severity::Warning,
                             pos_begin: Some(fragment.pos_begin),
                             pos_end: Some(fragment.pos_end),
                             message: format!("Command '{{{}}}' must be at the front.", cmd.name),
@@ -340,7 +358,7 @@ fn validate_string(
                     if let Some(c) = &cmd.case {
                         if !config.allow_cases() {
                             errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: String::from("No case selections allowed."),
@@ -348,7 +366,7 @@ fn validate_string(
                             });
                         } else if !info.allow_case {
                             errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!(
@@ -359,7 +377,7 @@ fn validate_string(
                             });
                         } else if !config.cases.contains(&c) {
                             errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!("Unknown case '{}'.", c),
@@ -374,7 +392,7 @@ fn validate_string(
                     if info.parameters.is_empty() {
                         if let Some(index) = cmd.index {
                             errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!(
@@ -398,7 +416,7 @@ fn validate_string(
 
                         if !used_parameters.insert(pos) {
                             errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!("Duplicate parameter '{{{}:{}}}'.", pos, cmd.name),
@@ -408,7 +426,7 @@ fn validate_string(
 
                         match opt_expected {
                             None => errors.push(ValidationError {
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!(
@@ -419,7 +437,7 @@ fn validate_string(
                             }),
                             Some(expected) if expected.get_norm_name() != info.get_norm_name() => {
                                 errors.push(ValidationError {
-                                    critical: true,
+                                    severity: Severity::Error,
                                     pos_begin: Some(fragment.pos_begin),
                                     pos_end: Some(fragment.pos_end),
                                     message: format!(
@@ -436,7 +454,7 @@ fn validate_string(
                     }
                 } else {
                     errors.push(ValidationError {
-                        critical: true,
+                        severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: format!("Unknown string command '{{{}}}'.", cmd.name),
@@ -448,7 +466,7 @@ fn validate_string(
             FragmentContent::Gender(g) => {
                 if !config.allow_genders() || config.genders.len() < 2 {
                     errors.push(ValidationError {
-                        critical: true,
+                        severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: String::from("No gender definitions allowed."),
@@ -456,7 +474,7 @@ fn validate_string(
                     });
                 } else if front == 2 {
                     errors.push(ValidationError {
-                        critical: false,
+                        severity: Severity::Warning,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: String::from("Gender definitions must be at the front."),
@@ -466,7 +484,7 @@ fn validate_string(
                     });
                 } else if front == 1 {
                     errors.push(ValidationError {
-                        critical: false,
+                        severity: Severity::Warning,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: String::from("Duplicate gender definition."),
@@ -476,7 +494,7 @@ fn validate_string(
                     front = 1;
                     if !config.genders.contains(&g.gender) {
                         errors.push(ValidationError {
-                            critical: true,
+                            severity: Severity::Error,
                             pos_begin: Some(fragment.pos_begin),
                             pos_end: Some(fragment.pos_end),
                             message: format!("Unknown gender '{}'.", g.gender),
@@ -503,7 +521,7 @@ fn validate_string(
                 let opt_ref_pos = cmd.indexref.or(opt_ref_pos);
                 if cmd.name == "G" && (!config.allow_genders() || config.genders.len() < 2) {
                     errors.push(ValidationError {
-                        critical: true,
+                        severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: String::from("No gender choices allowed."),
@@ -511,7 +529,7 @@ fn validate_string(
                     });
                 } else if cmd.name == "P" && config.plural_count < 2 {
                     errors.push(ValidationError {
-                        critical: true,
+                        severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
                         pos_end: Some(fragment.pos_end),
                         message: String::from("No plural choices allowed."),
@@ -522,7 +540,7 @@ fn validate_string(
                         "P" => {
                             if cmd.choices.len() != config.plural_count {
                                 errors.push(ValidationError {
-                                    critical: true,
+                                    severity: Severity::Error,
                                     pos_begin: Some(fragment.pos_begin),
                                     pos_end: Some(fragment.pos_end),
                                     message: format!(
@@ -537,7 +555,7 @@ fn validate_string(
                         "G" => {
                             if cmd.choices.len() != config.genders.len() {
                                 errors.push(ValidationError {
-                                    critical: true,
+                                    severity: Severity::Error,
                                     pos_begin: Some(fragment.pos_begin),
                                     pos_end: Some(fragment.pos_end),
                                     message: format!(
@@ -570,7 +588,7 @@ fn validate_string(
                                 "P" => {
                                     if !par_info.allow_plural {
                                         errors.push(ValidationError{
-                                            critical: true,
+                                            severity: Severity::Error,
                                             pos_begin: Some(fragment.pos_begin),
                                             pos_end: Some(fragment.pos_end),
                                             message: format!(
@@ -584,7 +602,7 @@ fn validate_string(
                                 "G" => {
                                     if !par_info.allow_gender {
                                         errors.push(ValidationError{
-                                            critical: true,
+                                            severity: Severity::Error,
                                             pos_begin: Some(fragment.pos_begin),
                                             pos_end: Some(fragment.pos_end),
                                             message: format!(
@@ -599,7 +617,7 @@ fn validate_string(
                             };
                         } else {
                             errors.push(ValidationError{
-                                critical: true,
+                                severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
                                 pos_end: Some(fragment.pos_end),
                                 message: format!(
@@ -611,7 +629,7 @@ fn validate_string(
                         }
                     } else {
                         errors.push(ValidationError {
-                            critical: true,
+                            severity: Severity::Error,
                             pos_begin: Some(fragment.pos_begin),
                             pos_end: Some(fragment.pos_end),
                             message: format!(
@@ -641,7 +659,7 @@ fn validate_string(
         if !used_parameters.contains(pos) {
             let norm_name = info.get_norm_name();
             errors.push(ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: None,
                 pos_end: None,
                 message: format!("String command '{{{}:{}}}' is missing.", pos, norm_name),
@@ -654,7 +672,7 @@ fn validate_string(
         let found_count = nonpositional_count.get(norm_name).map(|v| v.1).unwrap_or(0);
         if *occurence != Occurence::ANY && found_count == 0 {
             errors.push(ValidationError {
-                critical: false,
+                severity: Severity::Warning,
                 pos_begin: None,
                 pos_end: None,
                 message: format!("String command '{{{}}}' is missing.", norm_name),
@@ -662,7 +680,7 @@ fn validate_string(
             });
         } else if *occurence == Occurence::EXACT && *ex_count != found_count {
             errors.push(ValidationError {
-                critical: false,
+                severity: Severity::Warning,
                 pos_begin: None,
                 pos_end: None,
                 message: format!(
@@ -676,7 +694,7 @@ fn validate_string(
     for (norm_name, (occurence, _)) in &nonpositional_count {
         if *occurence != Occurence::ANY && signature.nonpositional_count.get(norm_name).is_none() {
             errors.push(ValidationError {
-                critical: false,
+                severity: Severity::Warning,
                 pos_begin: None,
                 pos_end: None,
                 message: format!("String command '{{{}}}' is unexpected.", norm_name),
@@ -811,7 +829,7 @@ mod tests {
         assert_eq!(
             err[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: Some(5),
                 pos_end: Some(14),
                 message: String::from(
@@ -836,7 +854,7 @@ mod tests {
         assert_eq!(
             err[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: Some(0),
                 pos_end: Some(12),
                 message: String::from("Unknown string command '{RAW_STRING}'."),
@@ -853,7 +871,7 @@ mod tests {
         assert_eq!(
             err[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: Some(0),
                 pos_end: Some(8),
                 message: String::from("Unknown string command '{FOOBAR}'."),
@@ -870,7 +888,7 @@ mod tests {
         assert_eq!(
             err[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: Some(0),
                 pos_end: Some(7),
                 message: String::from("Command '{RED}' cannot have a position reference."),
@@ -911,7 +929,7 @@ mod tests {
         assert_eq!(
             val_base[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: Some(0),
                 pos_end: Some(8),
                 message: String::from("Unknown string command '{FOOBAR}'."),
@@ -924,7 +942,7 @@ mod tests {
         assert_eq!(
             val_trans[0],
             ValidationError {
-                critical: true,
+                severity: Severity::Error,
                 pos_begin: None,
                 pos_end: None,
                 message: String::from("Base language text is invalid."),
@@ -957,7 +975,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(8),
                     message: String::from("Unknown string command '{FOOBAR}'."),
@@ -972,7 +990,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(7),
                     message: String::from("There is no parameter in position 1, found '{NUM}'."),
@@ -982,7 +1000,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{0:NUM}' is missing."),
@@ -997,7 +1015,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(7),
                     message: String::from("Expected '{0:NUM}', found '{COMMA}'."),
@@ -1012,7 +1030,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(7),
                     pos_end: Some(14),
                     message: String::from("Duplicate parameter '{0:NUM}'."),
@@ -1046,7 +1064,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: Some(5),
                     pos_end: Some(10),
                     message: String::from("Duplicate gender definition."),
@@ -1061,7 +1079,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: Some(10),
                     pos_end: Some(15),
                     message: String::from("Gender definitions must be at the front."),
@@ -1078,7 +1096,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: Some(3),
                     pos_end: Some(13),
                     message: String::from("Command '{BIG_FONT}' must be at the front."),
@@ -1093,7 +1111,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: Some(3),
                     pos_end: Some(8),
                     message: String::from("Gender definitions must be at the front."),
@@ -1105,7 +1123,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{BIG_FONT}' is missing."),
@@ -1139,7 +1157,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(7),
                     message: String::from("Command '{RED}' cannot have a position reference."),
@@ -1149,7 +1167,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(7),
                     pos_end: Some(19),
                     message: String::from("Unknown case 'z'."),
@@ -1159,7 +1177,7 @@ mod tests {
             assert_eq!(
                 val_trans[2],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(19),
                     pos_end: Some(28),
                     message: String::from("No case selection allowed for '{NUM}'."),
@@ -1179,7 +1197,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(10),
                     pos_end: Some(19),
                     message: String::from(
@@ -1191,7 +1209,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(19),
                     pos_end: Some(28),
                     message: String::from(
@@ -1213,7 +1231,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(10),
                     pos_end: Some(21),
                     message: String::from(
@@ -1225,7 +1243,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(21),
                     pos_end: Some(32),
                     message: String::from(
@@ -1242,7 +1260,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(10),
                     pos_end: Some(19),
                     message: String::from("'{G}' references position '2', which has no parameter."),
@@ -1252,7 +1270,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(19),
                     pos_end: Some(28),
                     message: String::from("'{P}' references position '2', which has no parameter."),
@@ -1267,7 +1285,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(5),
                     pos_end: Some(12),
                     message: String::from(
@@ -1279,7 +1297,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(27),
                     pos_end: Some(34),
                     message: String::from("'{G}' references position '2', which has no parameter."),
@@ -1308,7 +1326,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(5),
                     message: String::from("No gender definitions allowed."),
@@ -1318,7 +1336,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(10),
                     pos_end: Some(15),
                     message: String::from("No plural choices allowed."),
@@ -1328,7 +1346,7 @@ mod tests {
             assert_eq!(
                 val_trans[2],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(15),
                     pos_end: Some(20),
                     message: String::from("No gender choices allowed."),
@@ -1357,7 +1375,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(5),
                     message: String::from("No gender definitions allowed."),
@@ -1367,7 +1385,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(17),
                     pos_end: Some(24),
                     message: String::from("No gender choices allowed."),
@@ -1377,7 +1395,7 @@ mod tests {
             assert_eq!(
                 val_trans[2],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(24),
                     pos_end: Some(34),
                     message: String::from("No case selections allowed."),
@@ -1411,7 +1429,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(0),
                     pos_end: Some(5),
                     message: String::from("Unknown gender 'c'."),
@@ -1421,7 +1439,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(10),
                     pos_end: Some(19),
                     message: String::from("Expected 2 plural choices, found 3."),
@@ -1431,7 +1449,7 @@ mod tests {
             assert_eq!(
                 val_trans[2],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(19),
                     pos_end: Some(28),
                     message: String::from("Expected 2 gender choices, found 3."),
@@ -1441,7 +1459,7 @@ mod tests {
             assert_eq!(
                 val_trans[3],
                 ValidationError {
-                    critical: true,
+                    severity: Severity::Error,
                     pos_begin: Some(28),
                     pos_end: Some(38),
                     message: String::from("Unknown case 'z'."),
@@ -1482,7 +1500,7 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{}': expected 2 times, found 1 times."),
@@ -1492,7 +1510,7 @@ mod tests {
             assert_eq!(
                 val_trans[1],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{GREEN}' is missing."),
@@ -1502,7 +1520,7 @@ mod tests {
             assert_eq!(
                 val_trans[2],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from(
@@ -1514,7 +1532,7 @@ mod tests {
             assert_eq!(
                 val_trans[3],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{BLUE}' is unexpected."),
@@ -1524,7 +1542,7 @@ mod tests {
             assert_eq!(
                 val_trans[4],
                 ValidationError {
-                    critical: false,
+                    severity: Severity::Warning,
                     pos_begin: None,
                     pos_end: None,
                     message: String::from("String command '{SHIP}' is unexpected."),

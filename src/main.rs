@@ -41,7 +41,10 @@ fn main() {
     };
 
     for err in &result.errors {
-        let sev = if err.critical { "ERROR" } else { "WARNING" };
+        let sev = match err.severity {
+            validate::Severity::Error => "ERROR",
+            validate::Severity::Warning => "WARNING",
+        };
         let pos_begin = err
             .pos_begin
             .map_or(String::new(), |p| format!(" at position {}", p));
