@@ -39,7 +39,7 @@ jobs:
     - name: Create NPM package
       run: |
         wasm-pack build --release
-        sed -i s%nile-library%@nile/library% pkg/package.json
+        sed -i s%nile-library%@truebrain/nile-library% pkg/package.json
 
     - uses: JS-DevTools/npm-publish@v3
       with:
