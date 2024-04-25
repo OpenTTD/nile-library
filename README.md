@@ -50,20 +50,20 @@ fn validate_base(config: LanguageConfig, base: String) -> ValidationResult
 
 **Output:**
 * `errors`: List of errors. If this is not empty, the string should not be offered to translators.
-* `normalized`: The normalized text is the text, which should be displayed to translators.
+* `normalized`: The normalized text to display to translators.
     * In the normalized text, string commands like `RAW_STRING`, `STRING5`, ... are replaced with `STRING`.
     * Translators can copy the normalized text as template for their translation.
 
 **Example:**
 ```console
 >>> cargo run "{BLACK}Age: {LTBLUE}{STRING2}{BLACK}   Running Cost: {LTBLUE}{CURRENCY}/year"
-ERROR at byte 61: Unknown string command '{CURRENCY}'.
+ERROR at position 61 to 71: Unknown string command '{CURRENCY}'.
 
 >>> cargo run "{BLACK}Age: {LTBLUE}{STRING2}{BLACK}   Running Cost: {LTBLUE}{CURRENCY_LONG}/year"
 NORMALIZED:{BLACK}Age: {LTBLUE}{0:STRING}{BLACK}   Running Cost: {LTBLUE}{1:CURRENCY_LONG}/year
 ```
 
-### Step 2: Translators enter stuff
+### Step 2: Translators translates strings
 
 * Translators must provide a text for the default case.
 * Other cases are optional.
@@ -93,16 +93,15 @@ fn validate_translation(config: LanguageConfig, base: String, case: String, tran
     * `position`: Byte position in input string. `None`, if general message without location.
     * `message`: Error message.
     * `suggestion`: Some extended message with hints.
-* `normalized`: The normalized text is the text, which should be committed. In the normalized text, trailing whitespace and other junk has been sanitized.
+* `normalized`: The normalized text to committed. In the normalized text, trailing whitespace and other junk has been removed.
 
 **Example:**
 ```console
 >>> cargo run "{BLACK}Age: {LTBLUE}{STRING2}{BLACK}   Running Cost: {LTBLUE}{CURRENCY_LONG}/year" "{BLUE}Alter: {LTBLUE}{STRING}{BLACK} Betriebskosten: {LTBLUE}{0:CURRENCY_LONG}/Jahr"
-ERROR at byte 61: Duplicate parameter '{0:CURRENCY_LONG}'.
-ERROR at byte 61: Expected '{0:STRING2}', found '{CURRENCY_LONG}'.
+ERROR at position 61 to 78: Duplicate parameter '{0:CURRENCY_LONG}'.
+ERROR at position 61 to 78: Expected '{0:STRING2}', found '{CURRENCY_LONG}'.
 ERROR: String command '{1:CURRENCY_LONG}' is missing.
-WARNING: String command '{BLUE}' is unexpected.
-HINT: Remove this command.
+WARNING: String command '{BLUE}' is unexpected. HINT: Remove this command.
 
 >>> cargo run "{BLACK}Age: {LTBLUE}{STRING2}{BLACK}   Running Cost: {LTBLUE}{CURRENCY_LONG}/year" "{BLACK}Alter: {LTBLUE}{STRING}{BLACK} Betriebskosten: {LTBLUE}{CURRENCY_LONG}/Jahr"
 NORMALIZED:{BLACK}Alter: {LTBLUE}{0:STRING}{BLACK} Betriebskosten: {LTBLUE}{1:CURRENCY_LONG}/Jahr
