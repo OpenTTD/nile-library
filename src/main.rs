@@ -51,10 +51,8 @@ fn main() {
         let pos_end = err
             .pos_end
             .map_or(String::new(), |p| format!(" to {}", p));
-        println!("{}{}{}: {}", sev, pos_begin, pos_end, err.message);
-        if let Some(hint) = &err.suggestion {
-            println!("HINT: {}", hint);
-        }
+        let hint = err.suggestion.as_ref().map_or(String::new(), |h| format!(" HINT: {}", h));
+        println!("{}{}{}: {}{}", sev, pos_begin, pos_end, err.message, hint);
     }
 
     if let Some(normalized) = result.normalized {
