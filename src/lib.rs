@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 mod commands;
 mod parser;
-mod validate;
+pub mod validate;
 
 #[wasm_bindgen]
 pub fn validate_base(js_config: JsValue, base: String) -> JsValue {
