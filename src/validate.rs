@@ -190,9 +190,7 @@ fn remove_ascii_ctrl(t: &mut String) {
 }
 
 fn remove_trailing_blanks(t: &mut String) {
-    if let Some(last) = t.rfind(|c| c != ' ') {
-        t.truncate(last + 1);
-    }
+    t.truncate(t.trim_end().len());
 }
 
 /// Replace all ASCII control codes with blank.
@@ -775,18 +773,23 @@ mod tests {
         let mut s1 = String::from("");
         let mut s2 = String::from(" a b c ");
         let mut s3 = String::from("\0a\tb\rc\r\n");
+        let mut s4 = String::from("abc\u{b3}");
         remove_ascii_ctrl(&mut s1);
         remove_ascii_ctrl(&mut s2);
         remove_ascii_ctrl(&mut s3);
+        remove_ascii_ctrl(&mut s4);
         assert_eq!(s1, String::from(""));
         assert_eq!(s2, String::from(" a b c "));
         assert_eq!(s3, String::from(" a b c  "));
+        assert_eq!(s4, String::from("abc\u{b3}"));
         remove_trailing_blanks(&mut s1);
         remove_trailing_blanks(&mut s2);
         remove_trailing_blanks(&mut s3);
+        remove_trailing_blanks(&mut s4);
         assert_eq!(s1, String::from(""));
         assert_eq!(s2, String::from(" a b c"));
         assert_eq!(s3, String::from(" a b c"));
+        assert_eq!(s4, String::from("abc\u{b3}"));
     }
 
     #[test]
