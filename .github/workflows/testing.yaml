@@ -31,6 +31,10 @@ jobs:
         wasm-pack build --release --target web
         cargo build --release
 
+    - name: Run tests
+      run: |
+        cargo test
+
     - name: Check coding style
       run: |
         cargo fmt --check
