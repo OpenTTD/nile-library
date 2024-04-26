@@ -8,7 +8,7 @@ pub mod validate;
 #[wasm_bindgen]
 pub fn validate_base(js_config: JsValue, base: String) -> JsValue {
     let config: validate::LanguageConfig = serde_wasm_bindgen::from_value(js_config).unwrap();
-    let response = validate::validate_base(config, base);
+    let response = validate::validate_base(&config, &base);
     serde_wasm_bindgen::to_value(&response).unwrap()
 }
 
@@ -20,7 +20,7 @@ pub fn validate_translation(
     translation: String,
 ) -> JsValue {
     let config: validate::LanguageConfig = serde_wasm_bindgen::from_value(js_config).unwrap();
-    let response = validate::validate_translation(config, base, case, translation);
+    let response = validate::validate_translation(&config, &base, &case, &translation);
     serde_wasm_bindgen::to_value(&response).unwrap()
 }
 
