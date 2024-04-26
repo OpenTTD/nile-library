@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 #[derive(Debug, PartialEq)]
@@ -47,11 +48,12 @@ pub struct ParserError {
     pub message: String,
 }
 
+static PAT_COMMAND: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\{(?:(\d+):)?(|\{|[A-Z]+[A-Z0-9_]*)(?:\.(\w+))?\}$").unwrap());
+
 impl StringCommand {
     fn parse(string: &str) -> Option<StringCommand> {
-        let pat_command =
-            Regex::new(r"^\{(?:(\d+):)?(|\{|[A-Z]+[A-Z0-9_]*)(?:\.(\w+))?\}$").unwrap();
-        let caps = pat_command.captures(string)?;
+        let caps = PAT_COMMAND.captures(string)?;
         Some(StringCommand {
             index: caps.get(1).and_then(|v| v.as_str().parse().ok()),
             name: String::from(&caps[2]),
@@ -73,10 +75,11 @@ impl StringCommand {
     }
 }
 
+static PAT_GENDER: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\{G\s*=\s*(\w+)\}$").unwrap());
+
 impl GenderDefinition {
     fn parse(string: &str) -> Option<GenderDefinition> {
-        let pat_gender = Regex::new(r"^\{G\s*=\s*(\w+)\}$").unwrap();
-        let caps = pat_gender.captures(string)?;
+        let caps = PAT_GENDER.captures(string)?;
         Some(GenderDefinition {
             gender: String::from(&caps[1]),
         })
@@ -87,12 +90,14 @@ impl GenderDefinition {
     }
 }
 
+static PAT_CHOICE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\{([PG])(?:\s+(\d+)(?::(\d+))?)?(\s+[^\s0-9].*?)\s*\}$").unwrap());
+static PAT_ITEM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r##"^\s+(?:([^\s"]+)|"([^"]*)")"##).unwrap());
+
 impl ChoiceList {
     fn parse(string: &str) -> Option<ChoiceList> {
-        let pat_choice =
-            Regex::new(r"^\{([PG])(?:\s+(\d+)(?::(\d+))?)?(\s+[^\s0-9].*?)\s*\}$").unwrap();
-        let pat_item = Regex::new(r##"^\s+(?:([^\s"]+)|"([^"]*)")"##).unwrap();
-        let caps = pat_choice.captures(string)?;
+        let caps = PAT_CHOICE.captures(string)?;
         let mut result = ChoiceList {
             name: String::from(&caps[1]),
             indexref: caps.get(2).and_then(|v| v.as_str().parse().ok()),
@@ -101,7 +106,7 @@ impl ChoiceList {
         };
         let mut rest = &caps[4];
         while !rest.is_empty() {
-            let m = pat_item.captures(rest)?;
+            let m = PAT_ITEM.captures(rest)?;
             result
                 .choices
                 .push(String::from(m.get(1).or(m.get(2)).unwrap().as_str()));
