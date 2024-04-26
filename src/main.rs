@@ -32,12 +32,12 @@ fn main() {
 
     let result = match args.translation {
         Some(translation) => validate::validate_translation(
-            config,
-            args.base,
-            args.case.unwrap_or(String::from("default")),
-            translation,
+            &config,
+            &args.base,
+            &args.case.unwrap_or(String::from("default")),
+            &translation,
         ),
-        None => validate::validate_base(config, args.base),
+        None => validate::validate_base(&config, &args.base),
     };
 
     for err in &result.errors {

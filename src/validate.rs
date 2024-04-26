@@ -66,7 +66,7 @@ impl Serialize for Severity {
  *
  * @returns A normalized form of the base string for translators, and a list of error messages, if the base is invalid.
  */
-pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
+pub fn validate_base(config: &LanguageConfig, base: &String) -> ValidationResult {
     let mut base = match ParsedString::parse(&base) {
         Err(err) => {
             return ValidationResult {
@@ -109,10 +109,10 @@ pub fn validate_base(config: LanguageConfig, base: String) -> ValidationResult {
  * @returns A normalized form of the translation, and a list of error messages, if the translation is invalid.
  */
 pub fn validate_translation(
-    config: LanguageConfig,
-    base: String,
-    case: String,
-    translation: String,
+    config: &LanguageConfig,
+    base: &String,
+    case: &String,
+    translation: &String,
 ) -> ValidationResult {
     let base = match ParsedString::parse(&base) {
         Err(_) => {
