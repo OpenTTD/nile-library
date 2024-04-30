@@ -1,7 +1,7 @@
 use crate::commands::{CommandInfo, Dialect, Occurence, COMMANDS};
 use crate::parser::{FragmentContent, ParsedString};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Deserialize, Debug)]
 pub struct LanguageConfig {
@@ -221,7 +221,7 @@ fn sanitize_whitespace(parsed: &mut ParsedString) {
 }
 
 struct StringSignature {
-    parameters: HashMap<usize, &'static CommandInfo<'static>>,
+    parameters: HashMap<usize, (&'static CommandInfo<'static>, usize)>,
     nonpositional_count: BTreeMap<String, (Occurence, usize)>,
     // TODO track color/lineno/colorstack for positional parameters
 }
@@ -268,17 +268,10 @@ fn get_signature(
                     if let Some(index) = cmd.index {
                         pos = index;
                     }
-                    if let Some(existing) = signature.parameters.insert(pos, info) {
-                        errors.push(ValidationError {
-                            severity: Severity::Error,
-                            pos_begin: Some(fragment.pos_begin),
-                            pos_end: Some(fragment.pos_end),
-                            message: format!(
-                                "Command '{{{}:{}}}' references the same position as '{{{}:{}}}' before.",
-                                pos, cmd.name, pos, existing.name
-                            ),
-                            suggestion: Some(String::from("Assign unique position references.")),
-                        });
+                    if let Some(existing) = signature.parameters.get_mut(&pos) {
+                        existing.1 += 1;
+                    } else {
+                        signature.parameters.insert(pos, (info, 1));
                     }
                     pos += 1;
                 }
@@ -326,7 +319,7 @@ fn validate_string(
     }
 
     let mut errors = Vec::new();
-    let mut used_parameters = HashSet::new();
+    let mut positional_count: HashMap<usize, usize> = HashMap::new();
     let mut nonpositional_count: BTreeMap<String, (Occurence, usize)> = BTreeMap::new();
     let mut pos = 0;
     let mut front = 0;
@@ -336,7 +329,7 @@ fn validate_string(
                 let opt_expected = signature
                     .parameters
                     .get(&cmd.index.unwrap_or(pos))
-                    .map(|v| *v);
+                    .map(|v| (*v).0);
                 let opt_info =
                     opt_expected
                         .filter(|ex| ex.get_norm_name() == cmd.name)
@@ -412,28 +405,14 @@ fn validate_string(
                             pos = index;
                         }
 
-                        if !used_parameters.insert(pos) {
-                            errors.push(ValidationError {
-                                severity: Severity::Error,
-                                pos_begin: Some(fragment.pos_begin),
-                                pos_end: Some(fragment.pos_end),
-                                message: format!("Duplicate parameter '{{{}:{}}}'.", pos, cmd.name),
-                                suggestion: None,
-                            });
-                        }
-
-                        match opt_expected {
-                            None => errors.push(ValidationError {
-                                severity: Severity::Error,
-                                pos_begin: Some(fragment.pos_begin),
-                                pos_end: Some(fragment.pos_end),
-                                message: format!(
-                                    "There is no parameter in position {}, found '{{{}}}'.",
-                                    pos, cmd.name
-                                ),
-                                suggestion: None,
-                            }),
-                            Some(expected) if expected.get_norm_name() != info.get_norm_name() => {
+                        if let Some(expected) = opt_expected {
+                            if expected.get_norm_name() == info.get_norm_name() {
+                                if let Some(existing) = positional_count.get_mut(&pos) {
+                                    *existing += 1;
+                                } else {
+                                    positional_count.insert(pos, 1);
+                                }
+                            } else {
                                 errors.push(ValidationError {
                                     severity: Severity::Error,
                                     pos_begin: Some(fragment.pos_begin),
@@ -445,7 +424,17 @@ fn validate_string(
                                     suggestion: None,
                                 })
                             }
-                            _ => (),
+                        } else {
+                            errors.push(ValidationError {
+                                severity: Severity::Error,
+                                pos_begin: Some(fragment.pos_begin),
+                                pos_end: Some(fragment.pos_end),
+                                message: format!(
+                                    "There is no parameter in position {}, found '{{{}}}'.",
+                                    pos, cmd.name
+                                ),
+                                suggestion: None,
+                            });
                         }
 
                         pos += 1;
@@ -568,8 +557,8 @@ fn validate_string(
                         _ => panic!(),
                     };
 
-                    if let Some(ref_info) =
-                        opt_ref_pos.and_then(|ref_pos| signature.parameters.get(&ref_pos))
+                    if let Some(ref_info) = opt_ref_pos
+                        .and_then(|ref_pos| signature.parameters.get(&ref_pos).map(|v| v.0))
                     {
                         let ref_pos = opt_ref_pos.unwrap();
                         let ref_norm_name = ref_info.get_norm_name();
@@ -653,14 +642,26 @@ fn validate_string(
         }
     }
 
-    for (pos, info) in &signature.parameters {
-        if !used_parameters.contains(pos) {
-            let norm_name = info.get_norm_name();
+    for (pos, (info, ex_count)) in &signature.parameters {
+        let norm_name = info.get_norm_name();
+        let found_count = positional_count.get(pos).cloned().unwrap_or(0);
+        if info.occurence != Occurence::ANY && found_count == 0 {
             errors.push(ValidationError {
                 severity: Severity::Error,
                 pos_begin: None,
                 pos_end: None,
                 message: format!("String command '{{{}:{}}}' is missing.", pos, norm_name),
+                suggestion: None,
+            });
+        } else if info.occurence == Occurence::EXACT && *ex_count != found_count {
+            errors.push(ValidationError {
+                severity: Severity::Warning,
+                pos_begin: None,
+                pos_end: None,
+                message: format!(
+                    "String command '{{{}:{}}}': expected {} times, found {} times.",
+                    pos, norm_name, ex_count, found_count
+                ),
                 suggestion: None,
             });
         }
@@ -802,13 +803,17 @@ mod tests {
 
     #[test]
     fn test_signature_pos() {
-        let parsed = ParsedString::parse("{P a b}{RED}{NUM}{NBSP}{MONO_FONT}{5:STRING.foo}{RED}{2:STRING3.bar}{RAW_STRING}{G c d}").unwrap();
+        let parsed = ParsedString::parse("{P a b}{RED}{NUM}{NBSP}{MONO_FONT}{5:STRING.foo}{RED}{2:STRING3.bar}{RAW_STRING}{3:RAW_STRING}{G c d}").unwrap();
         let sig = get_signature(&Dialect::OPENTTD, &parsed).unwrap();
         assert_eq!(sig.parameters.len(), 4);
-        assert_eq!(sig.parameters.get(&0).unwrap().name, "NUM");
-        assert_eq!(sig.parameters.get(&5).unwrap().name, "STRING");
-        assert_eq!(sig.parameters.get(&2).unwrap().name, "STRING3");
-        assert_eq!(sig.parameters.get(&3).unwrap().name, "RAW_STRING");
+        assert_eq!(sig.parameters.get(&0).unwrap().0.name, "NUM");
+        assert_eq!(sig.parameters.get(&0).unwrap().1, 1);
+        assert_eq!(sig.parameters.get(&5).unwrap().0.name, "STRING");
+        assert_eq!(sig.parameters.get(&5).unwrap().1, 1);
+        assert_eq!(sig.parameters.get(&2).unwrap().0.name, "STRING3");
+        assert_eq!(sig.parameters.get(&2).unwrap().1, 1);
+        assert_eq!(sig.parameters.get(&3).unwrap().0.name, "RAW_STRING");
+        assert_eq!(sig.parameters.get(&3).unwrap().1, 2);
         assert_eq!(sig.nonpositional_count.len(), 3);
         assert_eq!(
             sig.nonpositional_count.get("RED"),
@@ -825,31 +830,13 @@ mod tests {
     }
 
     #[test]
-    fn test_signature_dup() {
-        let parsed = ParsedString::parse("{NUM}{0:COMMA}").unwrap();
-        let err = get_signature(&Dialect::OPENTTD, &parsed).err().unwrap();
-        assert_eq!(err.len(), 1);
-        assert_eq!(
-            err[0],
-            ValidationError {
-                severity: Severity::Error,
-                pos_begin: Some(5),
-                pos_end: Some(14),
-                message: String::from(
-                    "Command '{0:COMMA}' references the same position as '{0:NUM}' before."
-                ),
-                suggestion: Some(String::from("Assign unique position references.")),
-            }
-        );
-    }
-
-    #[test]
     fn test_signature_dialect() {
         let parsed = ParsedString::parse("{RAW_STRING}").unwrap();
 
         let sig = get_signature(&Dialect::OPENTTD, &parsed).unwrap();
         assert_eq!(sig.parameters.len(), 1);
-        assert_eq!(sig.parameters.get(&0).unwrap().name, "RAW_STRING");
+        assert_eq!(sig.parameters.get(&0).unwrap().0.name, "RAW_STRING");
+        assert_eq!(sig.parameters.get(&0).unwrap().1, 1);
         assert_eq!(sig.nonpositional_count.len(), 0);
 
         let err = get_signature(&Dialect::NEWGRF, &parsed).err().unwrap();
@@ -1014,7 +1001,7 @@ mod tests {
         {
             let trans = ParsedString::parse("{COMMA}").unwrap();
             let val_trans = validate_string(&config, &trans, Some(&base));
-            assert_eq!(val_trans.len(), 1);
+            assert_eq!(val_trans.len(), 2);
             assert_eq!(
                 val_trans[0],
                 ValidationError {
@@ -1022,6 +1009,16 @@ mod tests {
                     pos_begin: Some(0),
                     pos_end: Some(7),
                     message: String::from("Expected '{0:NUM}', found '{COMMA}'."),
+                    suggestion: None,
+                }
+            );
+            assert_eq!(
+                val_trans[1],
+                ValidationError {
+                    severity: Severity::Error,
+                    pos_begin: None,
+                    pos_end: None,
+                    message: String::from("String command '{0:NUM}' is missing."),
                     suggestion: None,
                 }
             );
@@ -1033,10 +1030,12 @@ mod tests {
             assert_eq!(
                 val_trans[0],
                 ValidationError {
-                    severity: Severity::Error,
-                    pos_begin: Some(7),
-                    pos_end: Some(14),
-                    message: String::from("Duplicate parameter '{0:NUM}'."),
+                    severity: Severity::Warning,
+                    pos_begin: None,
+                    pos_end: None,
+                    message: String::from(
+                        "String command '{0:NUM}': expected 1 times, found 2 times."
+                    ),
                     suggestion: None,
                 }
             );
