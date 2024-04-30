@@ -1499,19 +1499,9 @@ mod tests {
             let trans =
                 ParsedString::parse("{RED}{}{RED}{TRAIN}{BLUE}{TRAIN}{RIGHT_ARROW}{SHIP}").unwrap();
             let val_trans = validate_string(&config, &trans, Some(&base));
-            assert_eq!(val_trans.len(), 5);
+            assert_eq!(val_trans.len(), 4);
             assert_eq!(
                 val_trans[0],
-                ValidationError {
-                    severity: Severity::Warning,
-                    pos_begin: None,
-                    pos_end: None,
-                    message: String::from("String command '{}': expected 2 times, found 1 times."),
-                    suggestion: None,
-                }
-            );
-            assert_eq!(
-                val_trans[1],
                 ValidationError {
                     severity: Severity::Warning,
                     pos_begin: None,
@@ -1521,7 +1511,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                val_trans[2],
+                val_trans[1],
                 ValidationError {
                     severity: Severity::Warning,
                     pos_begin: None,
@@ -1533,7 +1523,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                val_trans[3],
+                val_trans[2],
                 ValidationError {
                     severity: Severity::Warning,
                     pos_begin: None,
@@ -1543,7 +1533,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                val_trans[4],
+                val_trans[3],
                 ValidationError {
                     severity: Severity::Warning,
                     pos_begin: None,

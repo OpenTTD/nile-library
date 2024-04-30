@@ -175,7 +175,7 @@ pub const COMMANDS: &'static [CommandInfo] = &[
         name: "",
         norm_name: None,
         dialects: DNGO,
-        occurence: Occurence::EXACT,
+        occurence: Occurence::ANY,
         front_only: false,
         allow_case: false,
         def_plural_subindex: None,
