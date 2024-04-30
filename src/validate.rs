@@ -337,15 +337,6 @@ fn validate_string(
                             .into_iter()
                             .find(|ci| ci.name == cmd.name && ci.dialects.contains(&dialect)));
                 if let Some(info) = opt_info {
-                    if info.front_only && front == 2 {
-                        errors.push(ValidationError {
-                            severity: Severity::Warning,
-                            pos_begin: Some(fragment.pos_begin),
-                            pos_end: Some(fragment.pos_end),
-                            message: format!("Command '{{{}}}' must be at the front.", cmd.name),
-                            suggestion: None,
-                        });
-                    }
                     if let Some(c) = &cmd.case {
                         if !config.allow_cases() {
                             errors.push(ValidationError {
@@ -1094,17 +1085,7 @@ mod tests {
         {
             let trans = ParsedString::parse("foo{BIG_FONT}bar{NUM}").unwrap();
             let val_trans = validate_string(&config, &trans, Some(&base));
-            assert_eq!(val_trans.len(), 1);
-            assert_eq!(
-                val_trans[0],
-                ValidationError {
-                    severity: Severity::Warning,
-                    pos_begin: Some(3),
-                    pos_end: Some(13),
-                    message: String::from("Command '{BIG_FONT}' must be at the front."),
-                    suggestion: None,
-                }
-            );
+            assert_eq!(val_trans.len(), 0);
         }
         {
             let trans = ParsedString::parse("foo{G=a}bar{NUM}").unwrap();
