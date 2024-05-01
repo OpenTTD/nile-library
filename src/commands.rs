@@ -1,3 +1,5 @@
+use crate::validate::Dialect;
+
 pub struct ParameterInfo {
     pub allow_plural: bool,
     pub allow_gender: bool,
@@ -8,34 +10,6 @@ pub enum Occurence {
     ANY,     //< Command can be added or removed in translation without restriction.
     NONZERO, //< Command must appear in translation if and only if it is present in the base, but the amount may differ.
     EXACT,   //< Command must match exactly with base.
-}
-
-#[derive(PartialEq, Copy, Clone)]
-pub enum Dialect {
-    NEWGRF,
-    GAMESCRIPT,
-    OPENTTD,
-}
-
-impl From<&str> for Dialect {
-    fn from(src: &str) -> Self {
-        match src {
-            "newgrf" => Dialect::NEWGRF,
-            "game-script" => Dialect::GAMESCRIPT,
-            "openttd" => Dialect::OPENTTD,
-            _ => panic!(),
-        }
-    }
-}
-
-impl Into<String> for Dialect {
-    fn into(self) -> String {
-        match self {
-            Dialect::NEWGRF => String::from("newgrf"),
-            Dialect::GAMESCRIPT => String::from("game-script"),
-            Dialect::OPENTTD => String::from("openttd"),
-        }
-    }
 }
 
 pub struct CommandInfo<'a> {
