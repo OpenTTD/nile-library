@@ -4,8 +4,8 @@ notifications:
       - openttd
       - openttd.notice
 
-  push:
-  commit-comment:
   pull-request:
+    except-by:
+    - dependabot\[bot\]
   issue:
   tag-created:
