@@ -1,11 +1,18 @@
-use crate::commands::{CommandInfo, Dialect, Occurence, COMMANDS};
+use crate::commands::{CommandInfo, Occurence, COMMANDS};
 use crate::parser::{FragmentContent, ParsedString};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Dialect {
+    NEWGRF,
+    GAMESCRIPT,
+    OPENTTD,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct LanguageConfig {
-    pub dialect: String, //< "newgrf", "game-script", "openttd"
+    pub dialect: Dialect,
     pub cases: Vec<String>,
     pub genders: Vec<String>,
     pub plural_count: usize,
@@ -32,17 +39,59 @@ pub struct ValidationResult {
     pub normalized: Option<String>,
 }
 
-impl LanguageConfig {
-    fn get_dialect(&self) -> Dialect {
-        self.dialect.as_str().into()
-    }
-
+impl Dialect {
     pub fn allow_cases(&self) -> bool {
-        self.get_dialect() != Dialect::GAMESCRIPT
+        *self != Self::GAMESCRIPT
     }
 
-    fn allow_genders(&self) -> bool {
-        self.get_dialect() != Dialect::GAMESCRIPT
+    pub fn allow_genders(&self) -> bool {
+        *self != Self::GAMESCRIPT
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::NEWGRF => "newgrf",
+            Self::GAMESCRIPT => "game-script",
+            Self::OPENTTD => "openttd",
+        }
+    }
+}
+
+impl TryFrom<&str> for Dialect {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "newgrf" => Ok(Dialect::NEWGRF),
+            "game-script" => Ok(Dialect::GAMESCRIPT),
+            "openttd" => Ok(Dialect::OPENTTD),
+            _ => Err(String::from("Unknown dialect")),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Dialect {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        let value = Dialect::try_from(string.as_str());
+        value.map_err(|_| {
+            serde::de::Error::unknown_variant(
+                string.as_str(),
+                &["game-script", "newgrf", "openttd"],
+            )
+        })
+    }
+}
+
+impl Serialize for Dialect {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -90,7 +139,7 @@ pub fn validate_base(config: &LanguageConfig, base: &String) -> ValidationResult
         }
     } else {
         sanitize_whitespace(&mut base);
-        normalize_string(&config.get_dialect(), &mut base);
+        normalize_string(&config.dialect, &mut base);
         ValidationResult {
             errors: errs,
             normalized: Some(base.compile()),
@@ -130,7 +179,7 @@ pub fn validate_translation(
         Ok(parsed) => parsed,
     };
     if case != "default" {
-        if !config.allow_cases() {
+        if !config.dialect.allow_cases() {
             return ValidationResult {
                 errors: vec![ValidationError {
                     severity: Severity::Error,
@@ -177,7 +226,7 @@ pub fn validate_translation(
         }
     } else {
         sanitize_whitespace(&mut translation);
-        normalize_string(&config.get_dialect(), &mut translation);
+        normalize_string(&config.dialect, &mut translation);
         ValidationResult {
             errors: errs,
             normalized: Some(translation.compile()),
@@ -299,9 +348,8 @@ fn validate_string(
     test: &ParsedString,
     base: Option<&ParsedString>,
 ) -> Vec<ValidationError> {
-    let dialect = config.get_dialect();
     let signature: StringSignature;
-    match get_signature(&dialect, base.unwrap_or(test)) {
+    match get_signature(&config.dialect, base.unwrap_or(test)) {
         Ok(sig) => signature = sig,
         Err(msgs) => {
             if base.is_some() {
@@ -333,12 +381,12 @@ fn validate_string(
                 let opt_info =
                     opt_expected
                         .filter(|ex| ex.get_norm_name() == cmd.name)
-                        .or(COMMANDS
-                            .into_iter()
-                            .find(|ci| ci.name == cmd.name && ci.dialects.contains(&dialect)));
+                        .or(COMMANDS.into_iter().find(|ci| {
+                            ci.name == cmd.name && ci.dialects.contains(&config.dialect)
+                        }));
                 if let Some(info) = opt_info {
                     if let Some(c) = &cmd.case {
-                        if !config.allow_cases() {
+                        if !config.dialect.allow_cases() {
                             errors.push(ValidationError {
                                 severity: Severity::Error,
                                 pos_begin: Some(fragment.pos_begin),
@@ -442,7 +490,7 @@ fn validate_string(
                 front = 2;
             }
             FragmentContent::Gender(g) => {
-                if !config.allow_genders() || config.genders.len() < 2 {
+                if !config.dialect.allow_genders() || config.genders.len() < 2 {
                     errors.push(ValidationError {
                         severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
@@ -497,7 +545,8 @@ fn validate_string(
                     _ => panic!(),
                 };
                 let opt_ref_pos = cmd.indexref.or(opt_ref_pos);
-                if cmd.name == "G" && (!config.allow_genders() || config.genders.len() < 2) {
+                if cmd.name == "G" && (!config.dialect.allow_genders() || config.genders.len() < 2)
+                {
                     errors.push(ValidationError {
                         severity: Severity::Error,
                         pos_begin: Some(fragment.pos_begin),
@@ -881,7 +930,7 @@ mod tests {
     #[test]
     fn test_validate_empty() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![],
             plural_count: 0,
@@ -898,7 +947,7 @@ mod tests {
     #[test]
     fn test_validate_invalid() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![],
             plural_count: 0,
@@ -935,7 +984,7 @@ mod tests {
     #[test]
     fn test_validate_positional() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![],
             plural_count: 0,
@@ -1036,7 +1085,7 @@ mod tests {
     #[test]
     fn test_validate_front() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![String::from("a"), String::from("b")],
             plural_count: 0,
@@ -1119,7 +1168,7 @@ mod tests {
     #[test]
     fn test_validate_position_references() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![String::from("x"), String::from("y")],
             genders: vec![String::from("a"), String::from("b")],
             plural_count: 2,
@@ -1293,7 +1342,7 @@ mod tests {
     #[test]
     fn test_validate_nochoices() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![],
             plural_count: 1,
@@ -1342,7 +1391,7 @@ mod tests {
     #[test]
     fn test_validate_gschoices() {
         let config = LanguageConfig {
-            dialect: String::from("game-script"),
+            dialect: Dialect::GAMESCRIPT,
             cases: vec![String::from("x"), String::from("y")],
             genders: vec![String::from("a"), String::from("b")],
             plural_count: 2,
@@ -1391,7 +1440,7 @@ mod tests {
     #[test]
     fn test_validate_choices() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![String::from("x"), String::from("y")],
             genders: vec![String::from("a"), String::from("b")],
             plural_count: 2,
@@ -1455,7 +1504,7 @@ mod tests {
     #[test]
     fn test_validate_nonpositional() {
         let config = LanguageConfig {
-            dialect: String::from("openttd"),
+            dialect: Dialect::OPENTTD,
             cases: vec![],
             genders: vec![],
             plural_count: 0,

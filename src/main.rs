@@ -24,7 +24,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let config = validate::LanguageConfig {
-        dialect: args.dialect,
+        dialect: validate::Dialect::try_from(args.dialect.as_str()).unwrap(),
         cases: args.cases,
         genders: args.genders,
         plural_count: args.plural_count,
